@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Gestión clínica, laboratorio y trazabilidad veterinaria." />
+    <title>HuellaVet · Red veterinaria</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span>+</span></div>
+          <div>
+            <strong>HuellaVet</strong>
+            <small>Red veterinaria</small>
+          </div>
+        </div>
+
+        <nav class="main-nav" aria-label="Navegación principal">
+          <p class="nav-caption">Gestión</p>
+          <button class="nav-item is-active" data-view="dashboard">
+            <span class="nav-icon" aria-hidden="true">◇</span><span>Panel general</span>
+          </button>
+          <button class="nav-item" data-view="pacientes">
+            <span class="nav-icon" aria-hidden="true">○</span><span>Pacientes</span>
+          </button>
+          <button class="nav-item" data-view="atencion">
+            <span class="nav-icon" aria-hidden="true">+</span><span>Atención clínica</span>
+          </button>
+          <button class="nav-item" data-view="laboratorio">
+            <span class="nav-icon" aria-hidden="true">△</span><span>Laboratorio</span>
+          </button>
+          <button class="nav-item" data-view="custodia">
+            <span class="nav-icon" aria-hidden="true">□</span><span>Custodia y envíos</span>
+          </button>
+          <button class="nav-item" data-view="facturacion">
+            <span class="nav-icon" aria-hidden="true">$</span><span>Facturación</span>
+          </button>
+          <button class="nav-item" data-view="reportes">
+            <span class="nav-icon" aria-hidden="true">↗</span><span>Reportes</span>
+          </button>
+          <p class="nav-caption">Sistema</p>
+          <button class="nav-item" data-view="configuracion">
+            <span class="nav-icon" aria-hidden="true">⚙</span><span>Configuración</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="health-card">
+            <span class="status-dot" id="api-dot"></span>
+            <div>
+              <strong id="api-status">Comprobando API</strong>
+              <small>SQLite · datos locales</small>
+            </div>
+          </div>
+          <a href="/docs" target="_blank" rel="noreferrer" class="docs-link">Abrir documentación API ↗</a>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="menu-button" id="menu-button" aria-label="Abrir menú" aria-expanded="false">☰</button>
+          <div class="page-heading">
+            <span class="eyebrow" id="page-eyebrow">Resumen operativo</span>
+            <h1 id="page-title">Panel general</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="today" id="today"></span>
+            <button class="button button-secondary" id="refresh-button">
+              <span aria-hidden="true">↻</span> Actualizar
+            </button>
+          </div>
+        </header>
+
+        <div class="content-frame" id="view-root" aria-live="polite">
+          <section class="loading-state">
+            <span class="spinner"></span>
+            <p>Preparando el espacio de trabajo…</p>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <header class="modal-header">
+          <div>
+            <span class="eyebrow" id="modal-eyebrow">Nueva operación</span>
+            <h2 id="modal-title">Formulario</h2>
+          </div>
+          <button class="icon-button" id="modal-close" aria-label="Cerrar">×</button>
+        </header>
+        <form id="modal-form">
+          <div class="modal-body" id="modal-fields"></div>
+          <footer class="modal-footer">
+            <button type="button" class="button button-ghost" id="modal-cancel">Cancelar</button>
+            <button type="submit" class="button button-primary" id="modal-submit">Guardar</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+
+    <aside class="detail-drawer" id="detail-drawer" aria-hidden="true">
+      <header class="drawer-header">
+        <div>
+          <span class="eyebrow" id="drawer-eyebrow">Detalle</span>
+          <h2 id="drawer-title">Información</h2>
+        </div>
+        <button class="icon-button" id="drawer-close" aria-label="Cerrar">×</button>
+      </header>
+      <div class="drawer-content" id="drawer-content"></div>
+    </aside>
+
+    <div class="toast-region" id="toast-region" aria-live="assertive"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

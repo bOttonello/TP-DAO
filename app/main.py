@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
 from app.api.routes import router
@@ -8,6 +11,7 @@ from app.core.exceptions import ErrorDominio
 from app.domain import ErrorDeDominio
 
 configuracion = obtener_configuracion()
+DIRECTORIO_FRONTEND = Path(__file__).resolve().parent / "frontend"
 app = FastAPI(
     title=configuracion.nombre_aplicacion,
     version="0.1.0",
@@ -17,6 +21,14 @@ app = FastAPI(
     ),
 )
 app.include_router(router)
+app.mount("/static", StaticFiles(directory=DIRECTORIO_FRONTEND), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def frontend() -> FileResponse:
+    """Entrega la interfaz web de HuellaVet desde el mismo servidor de la API."""
+
+    return FileResponse(DIRECTORIO_FRONTEND / "index.html")
 
 
 @app.exception_handler(ErrorDominio)

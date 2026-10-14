@@ -11,6 +11,11 @@ El sistema queda autocontenido en un único archivo, sin necesidad de instalar
 un servidor, y conserva transacciones, claves foráneas, índices y triggers para
 las reglas críticas. La API está desarrollada con FastAPI, SQLAlchemy 2 y Alembic.
 
+La aplicación incluye una interfaz web responsive, servida por el mismo
+backend, para trabajar con clientes, pacientes, turnos, atenciones,
+derivaciones, muestras, remitos, envíos, resultados, facturas, reportes y
+catálogos sin tener que operar directamente sobre Swagger.
+
 ## Qué resuelve
 
 - Alta y administración de clientes, mascotas e historias clínicas.
@@ -149,6 +154,8 @@ La documentación interactiva queda disponible en
 `http://localhost:8000/docs` y el control de salud en
 `http://localhost:8000/api/salud`.
 
+La interfaz principal queda disponible en `http://localhost:8000/`.
+
 ## Ejecución local
 
 No hace falta instalar ningún motor de base de datos. Alembic crea
@@ -161,6 +168,10 @@ python -m pip install -e ".[dev]"
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+Luego se abre `http://localhost:8000/` en el navegador. El frontend no
+necesita una instalación separada: utiliza HTML, CSS y JavaScript nativos y se
+comunica con `/api` en el mismo origen.
 
 ## Pruebas y calidad
 
@@ -187,6 +198,7 @@ TPDAO/
 │   ├── api/          # Endpoints HTTP
 │   ├── core/         # Configuración, sesión y errores
 │   ├── domain/       # State, Singleton y reglas de ciclo de vida
+│   ├── frontend/     # Interfaz web responsive
 │   ├── models/       # Modelo relacional SQLAlchemy
 │   ├── services/     # Casos de uso y reportes
 │   ├── main.py       # Aplicación FastAPI

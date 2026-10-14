@@ -15,10 +15,12 @@ from app.core.database import obtener_sesion
 from app.core.exceptions import RecursoNoEncontrado
 from app.models import (
     Analisis,
+    AplicacionVacuna,
     AtencionVeterinaria,
     Cliente,
     ClinicaVeterinaria,
     Contenedor,
+    Envio,
     EventoCustodia,
     Factura,
     HistoriaClinica,
@@ -33,6 +35,7 @@ from app.models import (
     Turno,
     Vacuna,
 )
+from app.models.enums import EstadoMuestra
 from app.schemas import (
     AnalisisCrear,
     AplicacionVacunaCrear,
@@ -339,6 +342,19 @@ def aplicar_vacuna(
     return _crear(sesion, lambda servicio: servicio.aplicar_vacuna(datos))
 
 
+@router.get("/vacunas/aplicaciones", tags=["Vacunación"])
+def listar_aplicaciones_vacunas(
+    mascota_id: UUID | None = None,
+    sesion: Session = Depends(obtener_sesion),
+):
+    consulta = select(AplicacionVacuna).order_by(
+        AplicacionVacuna.fecha_aplicacion.desc()
+    )
+    if mascota_id is not None:
+        consulta = consulta.where(AplicacionVacuna.mascota_id == mascota_id)
+    return serializar_lista(sesion.scalars(consulta).all())
+
+
 # Laboratorio y transporte ----------------------------------------------------
 @router.post("/ordenes-derivacion", status_code=201, tags=["Laboratorio"])
 def crear_orden(
@@ -379,6 +395,25 @@ def obtener_orden(orden_id: UUID, sesion: Session = Depends(obtener_sesion)):
 @router.post("/muestras", status_code=201, tags=["Laboratorio"])
 def extraer_muestra(datos: MuestraExtraer, sesion: Session = Depends(obtener_sesion)):
     return _crear(sesion, lambda servicio: servicio.extraer_muestra(datos))
+
+
+@router.get("/muestras", tags=["Laboratorio"])
+def listar_muestras(
+    orden_id: UUID | None = None,
+    remito_id: UUID | None = None,
+    estado: EstadoMuestra | None = None,
+    sesion: Session = Depends(obtener_sesion),
+):
+    consulta = select(MuestraBiologica).order_by(
+        MuestraBiologica.fecha_extraccion.desc()
+    )
+    if orden_id is not None:
+        consulta = consulta.where(MuestraBiologica.orden_id == orden_id)
+    if remito_id is not None:
+        consulta = consulta.where(MuestraBiologica.remito_id == remito_id)
+    if estado is not None:
+        consulta = consulta.where(MuestraBiologica.estado_actual == estado)
+    return serializar_lista(sesion.scalars(consulta).all())
 
 
 @router.post("/muestras/empaquetar", status_code=201, tags=["Custodia"])
@@ -425,6 +460,17 @@ def listar_remitos(sesion: Session = Depends(obtener_sesion)):
     return serializar_lista(
         sesion.scalars(select(RemitoBiologico).order_by(RemitoBiologico.fecha_emision.desc())).all()
     )
+
+
+@router.get("/envios", tags=["Custodia"])
+def listar_envios(
+    remito_id: UUID | None = None,
+    sesion: Session = Depends(obtener_sesion),
+):
+    consulta = select(Envio).order_by(Envio.fecha_salida.desc())
+    if remito_id is not None:
+        consulta = consulta.where(Envio.remito_id == remito_id)
+    return serializar_lista(sesion.scalars(consulta).all())
 
 
 @router.get("/muestras/{muestra_id}/trazabilidad", tags=["Custodia"])
