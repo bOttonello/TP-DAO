@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    environment:
+      DATABASE_URL: sqlite+pysqlite:////data/huellavet.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - huellavet_data:/data
+    restart: on-failure
+
+volumes:
+  huellavet_data:
