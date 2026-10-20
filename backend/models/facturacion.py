@@ -6,13 +6,13 @@ from uuid import UUID
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
-from app.models.base import IdentificadorMixin, MarcaTemporalMixin
-from app.models.enums import EstadoFactura, TipoComponente, enum_sql
+from backend.core.database import Base
+from backend.models.base import IdentificadorMixin, MarcaTemporalMixin
+from backend.models.enums import EstadoFactura, TipoComponente, enum_sql
 
 if TYPE_CHECKING:
-    from app.models.clinica import AtencionVeterinaria, Cliente, ClinicaVeterinaria
-    from app.models.laboratorio import OrdenAnalisis, OrdenDerivacion
+    from backend.models.clinica import AtencionVeterinaria, Cliente, ClinicaVeterinaria
+    from backend.models.laboratorio import OrdenAnalisis, OrdenDerivacion
 
 
 class Factura(IdentificadorMixin, MarcaTemporalMixin, Base):

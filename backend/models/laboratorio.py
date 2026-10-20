@@ -18,9 +18,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
-from app.models.base import IdentificadorMixin, MarcaTemporalMixin
-from app.models.enums import (
+from backend.core.database import Base
+from backend.models.base import IdentificadorMixin, MarcaTemporalMixin
+from backend.models.enums import (
     EstadoMuestra,
     EstadoOrden,
     EstadoSolicitudAnalisis,
@@ -30,9 +30,9 @@ from app.models.enums import (
 )
 
 if TYPE_CHECKING:
-    from app.models.clinica import AtencionVeterinaria, ProfesionalVeterinario
-    from app.models.facturacion import Factura
-    from app.models.transporte import (
+    from backend.models.clinica import AtencionVeterinaria, ProfesionalVeterinario
+    from backend.models.facturacion import Factura
+    from backend.models.transporte import (
         CadenaCustodia,
         EventoCustodia,
         RecepcionLaboratorio,

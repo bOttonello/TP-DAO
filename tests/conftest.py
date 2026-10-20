@@ -3,8 +3,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models  # noqa: F401  # registra todos los mappers
-from app.core.database import Base
+import backend.models  # noqa: F401  # registra todos los mappers
+from backend.core.database import Base
 
 
 @pytest.fixture()

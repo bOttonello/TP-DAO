@@ -6,11 +6,11 @@ from uuid import UUID
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
-from app.models.base import IdentificadorMixin, MarcaTemporalMixin
+from backend.core.database import Base
+from backend.models.base import IdentificadorMixin, MarcaTemporalMixin
 
 if TYPE_CHECKING:
-    from app.models.clinica import AtencionVeterinaria, Mascota, ProfesionalVeterinario
+    from backend.models.clinica import AtencionVeterinaria, Mascota, ProfesionalVeterinario
 
 
 class Vacuna(IdentificadorMixin, MarcaTemporalMixin, Base):

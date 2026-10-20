@@ -18,14 +18,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
-from app.models.base import IdentificadorMixin, MarcaTemporalMixin
-from app.models.enums import EstadoTurno, SexoMascota, TipoAtencion, TipoDocumento, enum_sql
+from backend.core.database import Base
+from backend.models.base import IdentificadorMixin, MarcaTemporalMixin
+from backend.models.enums import EstadoTurno, SexoMascota, TipoAtencion, TipoDocumento, enum_sql
 
 if TYPE_CHECKING:
-    from app.models.facturacion import Factura
-    from app.models.laboratorio import OrdenDerivacion
-    from app.models.vacunacion import AplicacionVacuna
+    from backend.models.facturacion import Factura
+    from backend.models.laboratorio import OrdenDerivacion
+    from backend.models.vacunacion import AplicacionVacuna
 
 
 class Cliente(IdentificadorMixin, MarcaTemporalMixin, Base):

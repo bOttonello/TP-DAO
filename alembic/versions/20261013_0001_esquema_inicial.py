@@ -7,9 +7,9 @@ Create Date: 2026-10-13
 
 from collections.abc import Sequence
 
-import app.models  # noqa: F401
+import backend.models  # noqa: F401
 from alembic import op
-from app.core.database import Base
+from backend.core.database import Base
 
 revision: str = "20261013_0001"
 down_revision: str | None = None
@@ -46,7 +46,7 @@ TRIGGERS = (
 def upgrade() -> None:
     conexion = op.get_bind()
     if conexion.dialect.name != "sqlite":
-        raise RuntimeError("HuellaVet usa exclusivamente SQLite")
+        raise RuntimeError("Patitas usa exclusivamente SQLite")
 
     # Esta revisión nació junto con los modelos. Las garantías que exceden los
     # CHECK/FK declarativos se agregan debajo mediante SQL nativo de SQLite.
@@ -509,7 +509,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     conexion = op.get_bind()
     if conexion.dialect.name != "sqlite":
-        raise RuntimeError("HuellaVet usa exclusivamente SQLite")
+        raise RuntimeError("Patitas usa exclusivamente SQLite")
 
     for trigger in TRIGGERS:
         op.execute(f"DROP TRIGGER IF EXISTS {trigger}")

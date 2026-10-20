@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.database import obtener_sesion
-from app.main import app
+from backend.core.database import obtener_sesion
+from backend.main import app
 
 RAIZ_PROYECTO = Path(__file__).resolve().parents[1]
 
@@ -20,15 +20,15 @@ def test_frontend_y_recursos_estaticos() -> None:
         estado_modal = cliente.get("/static/modal-state.js")
 
     assert pagina.status_code == 200
-    assert "HuellaVet" in pagina.text
+    assert "Patitas" in pagina.text
     assert "Panel general" in pagina.text
     assert estilos.status_code == 200
     assert "--sage-700" in estilos.text
     assert javascript.status_code == 200
     assert "renderDashboard" in javascript.text
     assert estado_modal.status_code == 200
-    assert pagina.text.index("modal-state.js?v=20261020.2") < pagina.text.index(
-        "app.js?v=20261020.2"
+    assert pagina.text.index("modal-state.js?v=20261020.3") < pagina.text.index(
+        "app.js?v=20261020.3"
     )
 
 

@@ -1,6 +1,6 @@
-# HuellaVet
+# Patitas
 
-HuellaVet es el backend que desarrollé para administrar una red de clínicas
+Patitas es el backend que desarrollé para administrar una red de clínicas
 veterinarias y su laboratorio central. El foco del sistema no está solamente en
 la atención de la mascota: también resuelve la derivación de estudios, el
 transporte seguro de muestras y la trazabilidad completa desde la extracción
@@ -134,6 +134,8 @@ fecha y clínica:
 - Pytest y Ruff
 - Docker Compose
 
+
+
 ## Ejecución con Docker
 
 1. Copiar la configuración de ejemplo:
@@ -143,7 +145,7 @@ fecha y clínica:
    ```
 
 2. Crear el contenedor. La migración se aplica automáticamente y la base queda
-   persistida en el volumen Docker `huellavet_data` (`/data/huellavet.db`
+   persistida en el volumen Docker `patitas_data` (`/data/patitas.db`
    dentro del contenedor):
 
    ```powershell
@@ -159,14 +161,14 @@ La interfaz principal queda disponible en `http://localhost:8000/`.
 ## Ejecución local
 
 No hace falta instalar ningún motor de base de datos. Alembic crea
-`huellavet.db` en la carpeta del proyecto:
+`patitas.db` en la carpeta del proyecto:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 alembic upgrade head
-uvicorn app.main:app --reload
+uvicorn backend.main:app --reload
 ```
 
 Luego se abre `http://localhost:8000/` en el navegador. El frontend no
@@ -194,15 +196,15 @@ historial.
 
 ```text
 TPDAO/
-├── app/
+├── backend/          # Aplicación FastAPI y reglas de negocio
 │   ├── api/          # Endpoints HTTP
 │   ├── core/         # Configuración, sesión y errores
 │   ├── domain/       # State, Singleton y reglas de ciclo de vida
-│   ├── frontend/     # Interfaz web responsive
 │   ├── models/       # Modelo relacional SQLAlchemy
 │   ├── services/     # Casos de uso y reportes
 │   ├── main.py       # Aplicación FastAPI
 │   └── schemas.py    # Contratos de entrada
+├── frontend/         # Interfaz web responsive (HTML, CSS y JavaScript)
 ├── alembic/          # Migraciones SQLite
 ├── docs/             # Decisiones de arquitectura
 └── tests/            # Pruebas unitarias e integradas

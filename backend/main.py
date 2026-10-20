@@ -5,13 +5,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
-from app.api.routes import router
-from app.core.config import obtener_configuracion
-from app.core.exceptions import ErrorDominio
-from app.domain import ErrorDeDominio
+from backend.api.routes import router
+from backend.core.config import obtener_configuracion
+from backend.core.exceptions import ErrorDominio
+from backend.domain import ErrorDeDominio
 
 configuracion = obtener_configuracion()
-DIRECTORIO_FRONTEND = Path(__file__).resolve().parent / "frontend"
+RAIZ_PROYECTO = Path(__file__).resolve().parents[1]
+DIRECTORIO_FRONTEND = RAIZ_PROYECTO / "frontend"
 app = FastAPI(
     title=configuracion.nombre_aplicacion,
     version="0.1.0",
@@ -26,7 +27,7 @@ app.mount("/static", StaticFiles(directory=DIRECTORIO_FRONTEND), name="static")
 
 @app.get("/", include_in_schema=False)
 def frontend() -> FileResponse:
-    """Entrega la interfaz web de HuellaVet desde el mismo servidor de la API."""
+    """Entrega la interfaz web de Patitas desde el mismo servidor de la API."""
 
     return FileResponse(DIRECTORIO_FRONTEND / "index.html")
 

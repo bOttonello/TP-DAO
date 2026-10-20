@@ -4,9 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Configuracion(BaseSettings):
-    nombre_aplicacion: str = "HuellaVet"
+    nombre_aplicacion: str = "Patitas"
     ambiente: str = "desarrollo"
-    database_url: str = "sqlite+pysqlite:///./huellavet.db"
+    database_url: str = "sqlite+pysqlite:///./patitas.db"
 
     model_config = SettingsConfigDict(
         env_file=".env",

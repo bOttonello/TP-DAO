@@ -20,7 +20,7 @@ from uuid import UUID
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
-from app.models import (
+from backend.models import (
     Analisis,
     AplicacionVacuna,
     AtencionVeterinaria,
@@ -37,7 +37,7 @@ from app.models import (
     RemitoBiologico,
     Vacuna,
 )
-from app.models.enums import EstadoFactura, EstadoMuestra
+from backend.models.enums import EstadoFactura, EstadoMuestra
 
 FechaFiltro = date | datetime | None
 ClinicaFiltro = UUID | str | None

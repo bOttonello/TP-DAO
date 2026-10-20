@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from app.domain import (
+from backend.domain import (
     CicloVidaMuestra,
     CicloVidaRemito,
     EstadoMuestra,

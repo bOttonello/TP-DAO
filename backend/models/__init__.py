@@ -1,4 +1,4 @@
-from app.models.clinica import (
+from backend.models.clinica import (
     AtencionVeterinaria,
     Cliente,
     ClinicaVeterinaria,
@@ -7,8 +7,8 @@ from app.models.clinica import (
     ProfesionalVeterinario,
     Turno,
 )
-from app.models.facturacion import ComponenteAtencion, Factura
-from app.models.laboratorio import (
+from backend.models.facturacion import ComponenteAtencion, Factura
+from backend.models.laboratorio import (
     Analisis,
     LaboratorioCentral,
     MuestraBiologica,
@@ -16,7 +16,7 @@ from app.models.laboratorio import (
     OrdenDerivacion,
     ResultadoAnalisis,
 )
-from app.models.transporte import (
+from backend.models.transporte import (
     CadenaCustodia,
     Contenedor,
     Envio,
@@ -26,7 +26,7 @@ from app.models.transporte import (
     RecepcionLaboratorio,
     RemitoBiologico,
 )
-from app.models.vacunacion import AplicacionVacuna, Vacuna
+from backend.models.vacunacion import AplicacionVacuna, Vacuna
 
 __all__ = [
     "Analisis",

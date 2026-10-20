@@ -6,12 +6,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.database import obtener_sesion
-from app.core.exceptions import ConflictoDeNegocio
-from app.main import app
-from app.models import EventoCustodia, OrdenAnalisis
-from app.models.enums import EstadoMuestra, EstadoRemito
-from app.schemas import (
+from backend.core.database import obtener_sesion
+from backend.core.exceptions import ConflictoDeNegocio
+from backend.main import app
+from backend.models import EventoCustodia, OrdenAnalisis
+from backend.models.enums import EstadoMuestra, EstadoRemito
+from backend.schemas import (
     AnalisisCrear,
     AtencionCrear,
     ClienteCrear,
@@ -32,11 +32,11 @@ from app.schemas import (
     TurnoCrear,
     VacunaCrear,
 )
-from app.services import ServicioHuellaVet
+from backend.services import ServicioPatitas
 
 
 def preparar_escenario(sesion: Session, *, despachar: bool = True) -> dict:
-    servicio = ServicioHuellaVet(sesion)
+    servicio = ServicioPatitas(sesion)
     cliente = servicio.crear_cliente(
         ClienteCrear(
             nombre="Ana",
@@ -65,7 +65,7 @@ def preparar_escenario(sesion: Session, *, despachar: bool = True) -> dict:
             cuit="30-71111111-1",
             direccion="Centro 100",
             telefono="3514440000",
-            email="centro@huellavet.com.ar",
+            email="centro@patitas.com.ar",
         )
     )
     laboratorio = servicio.crear_laboratorio(
@@ -74,7 +74,7 @@ def preparar_escenario(sesion: Session, *, despachar: bool = True) -> dict:
             codigo="LAB-01",
             direccion="Parque Industrial 50",
             telefono="3514550000",
-            email="laboratorio@huellavet.com.ar",
+            email="laboratorio@patitas.com.ar",
         )
     )
     profesional = servicio.crear_profesional(
@@ -84,7 +84,7 @@ def preparar_escenario(sesion: Session, *, despachar: bool = True) -> dict:
             nombre="Sofía",
             apellido="López",
             especialidad="Clínica general",
-            email="sofia@huellavet.com.ar",
+            email="sofia@patitas.com.ar",
             telefono="3514660000",
         )
     )
@@ -389,7 +389,7 @@ def test_factura_redondea_y_vincula_el_analisis(sesion: Session) -> None:
                 cuit="30-72222222-2",
                 direccion="Norte 200",
                 telefono="3514770000",
-                email="norte@huellavet.com.ar",
+                email="norte@patitas.com.ar",
             )
         )
         with pytest.raises(ConflictoDeNegocio, match="clínica facturada"):

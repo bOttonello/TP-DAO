@@ -5,7 +5,7 @@ from sqlalchemy import MetaData, create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.core.config import obtener_configuracion
+from backend.core.config import obtener_configuracion
 
 CONVENCION_NOMBRES = {
     "ix": "ix_%(column_0_label)s",

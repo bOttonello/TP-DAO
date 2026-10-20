@@ -1,8 +1,8 @@
-# Decisiones de arquitectura de HuellaVet
+# Decisiones de arquitectura de Patitas
 
 ## Alcance
 
-HuellaVet integra la atención clínica de una red veterinaria con la derivación de
+Patitas integra la atención clínica de una red veterinaria con la derivación de
 análisis a un laboratorio central. El agregado crítico es la muestra biológica:
 su estado solo puede avanzar mediante reglas explícitas y cada cambio genera un
 evento de custodia que no puede editarse ni borrarse.

@@ -18,9 +18,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
-from app.models.base import IdentificadorMixin, MarcaTemporalMixin
-from app.models.enums import (
+from backend.core.database import Base
+from backend.models.base import IdentificadorMixin, MarcaTemporalMixin
+from backend.models.enums import (
     EstadoContenedor,
     EstadoEnvio,
     EstadoMuestra,
@@ -32,8 +32,8 @@ from app.models.enums import (
 )
 
 if TYPE_CHECKING:
-    from app.models.clinica import ClinicaVeterinaria
-    from app.models.laboratorio import LaboratorioCentral, MuestraBiologica
+    from backend.models.clinica import ClinicaVeterinaria
+    from backend.models.laboratorio import LaboratorioCentral, MuestraBiologica
 
 
 class Contenedor(IdentificadorMixin, MarcaTemporalMixin, Base):

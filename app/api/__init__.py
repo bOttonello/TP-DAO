@@ -1,2 +1,0 @@
-"""Rutas HTTP de HuellaVet."""
-

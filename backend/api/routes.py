@@ -11,9 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.database import obtener_sesion
-from app.core.exceptions import RecursoNoEncontrado
-from app.models import (
+from backend.core.database import obtener_sesion
+from backend.core.exceptions import RecursoNoEncontrado
+from backend.models import (
     Analisis,
     AplicacionVacuna,
     AtencionVeterinaria,
@@ -35,8 +35,8 @@ from app.models import (
     Turno,
     Vacuna,
 )
-from app.models.enums import EstadoMuestra
-from app.schemas import (
+from backend.models.enums import EstadoMuestra
+from backend.schemas import (
     AnalisisCrear,
     AplicacionVacunaCrear,
     AtencionCrear,
@@ -60,8 +60,8 @@ from app.schemas import (
     TurnoCrear,
     VacunaCrear,
 )
-from app.services import ServicioHuellaVet
-from app.services.reportes import (
+from backend.services import ServicioPatitas
+from backend.services.reportes import (
     atenciones_y_derivaciones,
     facturacion_por_clinica_y_componente,
     muestras_rechazadas,
@@ -115,14 +115,14 @@ def serializar_factura(factura: Factura) -> dict[str, Any]:
 
 def _crear(sesion: Session, operacion):
     with sesion.begin():
-        entidad = operacion(ServicioHuellaVet(sesion))
+        entidad = operacion(ServicioPatitas(sesion))
         resultado = serializar(entidad)
     return resultado
 
 
 @router.get("/salud", tags=["Sistema"])
 def salud() -> dict[str, str]:
-    return {"estado": "ok", "servicio": "HuellaVet"}
+    return {"estado": "ok", "servicio": "Patitas"}
 
 
 # Clientes y mascotas ---------------------------------------------------------
@@ -361,7 +361,7 @@ def crear_orden(
     datos: OrdenDerivacionCrear, sesion: Session = Depends(obtener_sesion)
 ):
     with sesion.begin():
-        orden = ServicioHuellaVet(sesion).crear_orden_derivacion(datos)
+        orden = ServicioPatitas(sesion).crear_orden_derivacion(datos)
         resultado = serializar_orden(orden)
     return resultado
 
@@ -439,7 +439,7 @@ def registrar_transferencia(
     sesion: Session = Depends(obtener_sesion),
 ):
     with sesion.begin():
-        eventos = ServicioHuellaVet(sesion).registrar_transferencia_custodia(
+        eventos = ServicioPatitas(sesion).registrar_transferencia_custodia(
             envio_id, datos
         )
         resultado = serializar_lista(eventos)
@@ -513,7 +513,7 @@ def listar_resultados(
 @router.post("/facturas", status_code=201, tags=["Facturación"])
 def emitir_factura(datos: FacturaCrear, sesion: Session = Depends(obtener_sesion)):
     with sesion.begin():
-        factura = ServicioHuellaVet(sesion).emitir_factura(datos)
+        factura = ServicioPatitas(sesion).emitir_factura(datos)
         resultado = serializar_factura(factura)
     return resultado
 

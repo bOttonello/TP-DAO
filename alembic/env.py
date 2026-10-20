@@ -2,10 +2,10 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
-import app.models  # noqa: F401
+import backend.models  # noqa: F401
 from alembic import context
-from app.core.config import obtener_configuracion
-from app.core.database import Base
+from backend.core.config import obtener_configuracion
+from backend.core.database import Base
 
 config = context.config
 # ``ConfigParser`` interpreta ``%`` como interpolación. Las URL de conexión

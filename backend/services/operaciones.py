@@ -7,9 +7,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import ConflictoDeNegocio, RecursoNoEncontrado
-from app.domain import CicloVidaMuestra, CicloVidaRemito, TransicionEstado
-from app.models import (
+from backend.core.exceptions import ConflictoDeNegocio, RecursoNoEncontrado
+from backend.domain import CicloVidaMuestra, CicloVidaRemito, TransicionEstado
+from backend.models import (
     Analisis,
     AplicacionVacuna,
     AtencionVeterinaria,
@@ -36,7 +36,7 @@ from app.models import (
     Turno,
     Vacuna,
 )
-from app.models.enums import (
+from backend.models.enums import (
     EstadoContenedor,
     EstadoEnvio,
     EstadoFactura,
@@ -55,7 +55,7 @@ from app.models.enums import (
     TipoEventoRemito,
     TipoMuestra,
 )
-from app.schemas import (
+from backend.schemas import (
     AnalisisCrear,
     AplicacionVacunaCrear,
     AtencionCrear,
@@ -91,7 +91,7 @@ def _numero(prefijo: str) -> str:
     return f"{prefijo}-{ahora_utc():%Y%m%d}-{uuid4().hex[:10].upper()}"
 
 
-class ServicioHuellaVet:
+class ServicioPatitas:
     """Orquesta los casos de uso y conserva cada regla dentro de una transacción.
 
     Los métodos no hacen ``commit``: la API o el consumidor decide el límite de

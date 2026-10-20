@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "huellavet"
+name = "patitas"
 version = "0.1.0"
 description = "Red de clínicas veterinarias con trazabilidad de muestras biológicas"
 readme = "README.md"
@@ -27,7 +27,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["backend"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -2,12 +2,12 @@ services:
   api:
     build: .
     environment:
-      DATABASE_URL: sqlite+pysqlite:////data/huellavet.db
+      DATABASE_URL: sqlite+pysqlite:////data/patitas.db
     ports:
       - "8000:8000"
     volumes:
-      - huellavet_data:/data
+      - patitas_data:/data
     restart: on-failure
 
 volumes:
-  huellavet_data:
+  patitas_data:

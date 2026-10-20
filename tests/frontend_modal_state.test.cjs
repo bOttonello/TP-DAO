@@ -5,7 +5,7 @@ const test = require("node:test");
 
 const {
   crearControlEnvioModal,
-} = require("../app/frontend/modal-state.js");
+} = require("../frontend/modal-state.js");
 
 function crearEscenario() {
   const estado = { submitting: false };

@@ -1,4 +1,4 @@
-"""Núcleo de dominio de HuellaVet."""
+"""Núcleo de dominio de Patitas."""
 
 from .estados import (
     CicloVidaMuestra,

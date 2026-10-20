@@ -8,8 +8,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.core.database import Base
-from app.models import (
+from backend.core.database import Base
+from backend.models import (
     Analisis,
     AtencionVeterinaria,
     Cliente,
@@ -29,7 +29,7 @@ from app.models import (
     RemitoBiologico,
     Vacuna,
 )
-from app.models.enums import (
+from backend.models.enums import (
     EstadoContenedor,
     EstadoEnvio,
     EstadoFactura,
@@ -44,7 +44,7 @@ from app.models.enums import (
     TipoDocumento,
     TipoMuestra,
 )
-from app.services.reportes import (
+from backend.services.reportes import (
     reporte_atenciones_y_derivaciones,
     reporte_facturacion_por_clinica_y_componente,
     reporte_muestras_rechazadas,
