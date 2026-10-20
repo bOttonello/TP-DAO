@@ -10,6 +10,7 @@ const state = {
   reportData: null,
   reportFilters: {},
   modal: null,
+  submitting: false,
 };
 
 const viewMeta = {
@@ -31,6 +32,7 @@ const modalBackdrop = $("#modal-backdrop");
 const modalForm = $("#modal-form");
 const modalFields = $("#modal-fields");
 const drawer = $("#detail-drawer");
+const controlEnvioModal = window.crearControlEnvioModal(state, () => $("#modal-submit"));
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -430,20 +432,14 @@ function formConfig(name, context = {}) {
   };
 }
 
-function prepararBotonEnvio(method) {
-  const submit = $("#modal-submit");
-  submit.disabled = false;
-  submit.textContent = method === "PATCH" ? "Guardar cambios" : "Confirmar";
-  return submit;
-}
-
 async function openForm(name, context = {}) {
-  await loadCatalogs();
+  if (controlEnvioModal.estaEnviando()) return;
   const config = formConfig(name, context);
+  controlEnvioModal.restablecer(config.method);
+  await loadCatalogs();
   state.modal = config;
   $("#modal-title").textContent = config.title;
   $("#modal-eyebrow").textContent = config.eyebrow;
-  prepararBotonEnvio(config.method);
   modalFields.innerHTML = `<div class="form-grid">${config.fields.map((field) => renderField(field, config.values || {})).join("")}</div>`;
   if (config.fields.some((field) => field.type === "repeat")) addComponentRow();
   modalBackdrop.hidden = false;
@@ -452,10 +448,15 @@ async function openForm(name, context = {}) {
 }
 
 function closeModal() {
+  if (controlEnvioModal.estaEnviando()) return false;
+  const method = state.modal?.method || "POST";
   modalBackdrop.hidden = true;
   document.body.style.overflow = "";
   modalForm.reset();
+  modalForm.removeAttribute("aria-busy");
+  controlEnvioModal.restablecer(method);
   state.modal = null;
+  return true;
 }
 
 function serializeForm(config) {
@@ -500,20 +501,30 @@ async function submitModal(event) {
   event.preventDefault();
   const config = state.modal;
   if (!config) return;
-  const submit = $("#modal-submit");
-  submit.disabled = true;
-  submit.textContent = "Guardando…";
+  let body;
   try {
-    const body = serializeForm(config);
-    await api(config.endpoint, { method: config.method, body });
-    closeModal();
-    state.cache = {};
-    toast("Los datos se guardaron correctamente.");
-    await renderCurrentView();
+    body = serializeForm(config);
   } catch (error) {
     toast(error.message, "error");
-    prepararBotonEnvio(config.method);
+    return;
   }
+  if (!controlEnvioModal.iniciar(config.method)) return;
+  modalForm.setAttribute("aria-busy", "true");
+  let guardado = false;
+  try {
+    await api(config.endpoint, { method: config.method, body });
+    guardado = true;
+  } catch (error) {
+    toast(error.message, "error");
+  } finally {
+    modalForm.removeAttribute("aria-busy");
+    controlEnvioModal.restablecer(config.method);
+  }
+  if (!guardado) return;
+  closeModal();
+  state.cache = {};
+  toast("Los datos se guardaron correctamente.");
+  await renderCurrentView();
 }
 
 function openDrawer(title, data, eyebrow = "Detalle") {

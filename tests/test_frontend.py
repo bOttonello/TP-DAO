@@ -1,8 +1,15 @@
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.database import obtener_sesion
 from app.main import app
+
+RAIZ_PROYECTO = Path(__file__).resolve().parents[1]
 
 
 def test_frontend_y_recursos_estaticos() -> None:
@@ -10,6 +17,7 @@ def test_frontend_y_recursos_estaticos() -> None:
         pagina = cliente.get("/")
         estilos = cliente.get("/static/styles.css")
         javascript = cliente.get("/static/app.js")
+        estado_modal = cliente.get("/static/modal-state.js")
 
     assert pagina.status_code == 200
     assert "HuellaVet" in pagina.text
@@ -18,9 +26,26 @@ def test_frontend_y_recursos_estaticos() -> None:
     assert "--sage-700" in estilos.text
     assert javascript.status_code == 200
     assert "renderDashboard" in javascript.text
-    assert "function prepararBotonEnvio(method)" in javascript.text
-    assert "submit.disabled = false;" in javascript.text
-    assert javascript.text.count("prepararBotonEnvio(config.method);") == 2
+    assert estado_modal.status_code == 200
+    assert pagina.text.index("modal-state.js?v=20261020.2") < pagina.text.index(
+        "app.js?v=20261020.2"
+    )
+
+
+def test_ciclo_de_estado_del_modal_en_javascript() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js no está disponible para la prueba del frontend")
+
+    resultado = subprocess.run(
+        [node, "--test", "tests/frontend_modal_state.test.cjs"],
+        cwd=RAIZ_PROYECTO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert resultado.returncode == 0, resultado.stdout + resultado.stderr
 
 
 def test_listados_necesarios_para_el_frontend(sesion: Session) -> None:
