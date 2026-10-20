@@ -18,6 +18,9 @@ def test_frontend_y_recursos_estaticos() -> None:
     assert "--sage-700" in estilos.text
     assert javascript.status_code == 200
     assert "renderDashboard" in javascript.text
+    assert "function prepararBotonEnvio(method)" in javascript.text
+    assert "submit.disabled = false;" in javascript.text
+    assert javascript.text.count("prepararBotonEnvio(config.method);") == 2
 
 
 def test_listados_necesarios_para_el_frontend(sesion: Session) -> None:

@@ -430,13 +430,20 @@ function formConfig(name, context = {}) {
   };
 }
 
+function prepararBotonEnvio(method) {
+  const submit = $("#modal-submit");
+  submit.disabled = false;
+  submit.textContent = method === "PATCH" ? "Guardar cambios" : "Confirmar";
+  return submit;
+}
+
 async function openForm(name, context = {}) {
   await loadCatalogs();
   const config = formConfig(name, context);
   state.modal = config;
   $("#modal-title").textContent = config.title;
   $("#modal-eyebrow").textContent = config.eyebrow;
-  $("#modal-submit").textContent = config.method === "PATCH" ? "Guardar cambios" : "Confirmar";
+  prepararBotonEnvio(config.method);
   modalFields.innerHTML = `<div class="form-grid">${config.fields.map((field) => renderField(field, config.values || {})).join("")}</div>`;
   if (config.fields.some((field) => field.type === "repeat")) addComponentRow();
   modalBackdrop.hidden = false;
@@ -505,8 +512,7 @@ async function submitModal(event) {
     await renderCurrentView();
   } catch (error) {
     toast(error.message, "error");
-    submit.disabled = false;
-    submit.textContent = config.method === "PATCH" ? "Guardar cambios" : "Confirmar";
+    prepararBotonEnvio(config.method);
   }
 }
 
