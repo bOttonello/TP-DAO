@@ -174,6 +174,11 @@ class Turno(IdentificadorMixin, MarcaTemporalMixin, Base):
     mascota_id: Mapped[UUID] = mapped_column(
         ForeignKey("mascotas.id", ondelete="RESTRICT"), index=True
     )
+    tipo: Mapped[TipoAtencion] = mapped_column(
+        enum_sql(TipoAtencion, "tipo_atencion_turno"),
+        default=TipoAtencion.CONSULTA,
+        server_default=TipoAtencion.CONSULTA.value,
+    )
     inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     fin: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     estado: Mapped[EstadoTurno] = mapped_column(

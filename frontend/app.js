@@ -33,6 +33,11 @@ const modalForm = $("#modal-form");
 const modalFields = $("#modal-fields");
 const drawer = $("#detail-drawer");
 const controlEnvioModal = window.crearControlEnvioModal(state, () => $("#modal-submit"));
+const {
+  fechaHoraLocal,
+  validarIntervaloTurno,
+  validarNumeroEnRango,
+} = window.reglasFormulario;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -166,8 +171,8 @@ function itemLabel(source, item) {
     analisis: `${item.nombre} · ${item.codigo}`,
     vacunas: `${item.nombre} · ${item.especie_objetivo}`,
     contenedores: `${item.codigo} · ${titleCase(item.estado)}`,
-    turnos: `${formatDate(item.inicio)} · ${shortId(item.id)}`,
-    atenciones: `${titleCase(item.tipo)} · ${formatDate(item.fecha)}`,
+    turnos: `${titleCase(item.tipo)} · ${formatDate(item.inicio)}`,
+    atenciones: `${findById("mascotas", item.mascota_id)?.nombre || "Paciente"} · ${titleCase(item.tipo)} · ${formatDate(item.fecha)}`,
     ordenes: `${item.numero} · ${titleCase(item.estado)}`,
     muestras: `${item.codigo} · ${titleCase(item.estado_actual)}`,
     remitos: `${item.numero} · ${titleCase(item.estado)}`,
@@ -213,7 +218,10 @@ function renderField(field, values) {
   if (field.type === "select" || field.type === "multiselect") {
     const multiple = field.type === "multiselect" ? "multiple" : "";
     const options = field.source ? optionsFor(field.source, value) : choiceOptions(field.choices || [], value);
-    return `<div class="field ${full}"><label for="field-${field.name}">${escapeHtml(field.label)}</label><select id="field-${field.name}" name="${field.name}" ${multiple} ${required}><option value="">${field.type === "multiselect" ? "Seleccione una o más opciones" : "Seleccione…"}</option>${options}</select>${help}</div>`;
+    const placeholder = options
+      ? (field.type === "multiselect" ? "Seleccione una o más opciones" : "Seleccione…")
+      : "No hay opciones disponibles";
+    return `<div class="field ${full}"><label for="field-${field.name}">${escapeHtml(field.label)}</label><select id="field-${field.name}" name="${field.name}" ${multiple} ${required}><option value="">${placeholder}</option>${options}</select>${help}</div>`;
   }
 
   if (field.type === "textarea" || field.type === "json") {
@@ -240,6 +248,7 @@ function addComponentRow(values = {}) {
 }
 
 function formConfig(name, context = {}) {
+  const minimoTurno = fechaHoraLocal();
   const configs = {
     cliente: {
       title: context.id ? "Editar responsable" : "Nuevo responsable",
@@ -336,10 +345,11 @@ function formConfig(name, context = {}) {
       ],
     },
     turno: {
-      title: "Programar turno", eyebrow: "Agenda médica", endpoint: "/turnos", method: "POST", fields: [
+      title: "Agendar atención", eyebrow: "Agenda médica", endpoint: "/turnos", method: "POST", fields: [
+        { name: "tipo", label: "Tipo de atención", type: "select", choices: ["consulta", "control", "urgencia"], value: "consulta", required: true },
         { name: "clinica_id", label: "Clínica", type: "select", source: "clinicas", required: true }, { name: "profesional_id", label: "Profesional", type: "select", source: "profesionales", required: true },
         { name: "mascota_id", label: "Paciente", type: "select", source: "mascotas", required: true }, { name: "motivo", label: "Motivo", required: true },
-        { name: "inicio", label: "Inicio", type: "datetime-local", required: true }, { name: "fin", label: "Fin", type: "datetime-local", required: true },
+        { name: "inicio", label: "Día y horario", type: "datetime-local", min: minimoTurno, required: true }, { name: "fin", label: "Finalización", type: "datetime-local", min: minimoTurno, required: true },
         { name: "observaciones", label: "Observaciones", type: "textarea", full: true },
       ],
     },
@@ -348,9 +358,7 @@ function formConfig(name, context = {}) {
         { name: "mascota_id", label: "Paciente", type: "select", source: "mascotas", required: true }, { name: "clinica_id", label: "Clínica", type: "select", source: "clinicas", required: true },
         { name: "profesional_id", label: "Profesional", type: "select", source: "profesionales", required: true }, { name: "turno_id", label: "Turno asociado", type: "select", source: "turnos" },
         { name: "tipo", label: "Tipo", type: "select", choices: ["consulta", "control", "urgencia"], required: true }, { name: "motivo", label: "Motivo", required: true },
-        { name: "peso_kg", label: "Peso (kg)", type: "number", step: "0.01", min: "0.01" }, { name: "temperatura_c", label: "Temperatura (°C)", type: "number", step: "0.1", min: "30", max: "45" },
-        { name: "diagnostico", label: "Diagnóstico", type: "textarea" }, { name: "tratamiento", label: "Tratamiento", type: "textarea" },
-        { name: "observaciones", label: "Observaciones", type: "textarea", full: true },
+        { name: "peso_kg", label: "Peso (kg)", type: "number", step: "0.01", min: "0.01" }, { name: "temperatura_c", label: "Temperatura (°C)", type: "number", step: "0.1", min: "24", max: "45" },
       ],
     },
     aplicacionVacuna: {
@@ -437,11 +445,21 @@ async function openForm(name, context = {}) {
   const config = formConfig(name, context);
   controlEnvioModal.restablecer(config.method);
   await loadCatalogs();
+  if (name === "factura") {
+    await fetchCached("atenciones", "/atenciones", true);
+  }
   state.modal = config;
   $("#modal-title").textContent = config.title;
   $("#modal-eyebrow").textContent = config.eyebrow;
   modalFields.innerHTML = `<div class="form-grid">${config.fields.map((field) => renderField(field, config.values || {})).join("")}</div>`;
   if (config.fields.some((field) => field.type === "repeat")) addComponentRow();
+  if (name === "turno") {
+    const inicio = $("#field-inicio", modalFields);
+    const fin = $("#field-fin", modalFields);
+    const sincronizarFin = () => { fin.min = inicio.value || fechaHoraLocal(); };
+    inicio.addEventListener("input", sincronizarFin);
+    sincronizarFin();
+  }
   modalBackdrop.hidden = false;
   document.body.style.overflow = "hidden";
   window.setTimeout(() => $("input, select, textarea", modalFields)?.focus(), 20);
@@ -471,12 +489,18 @@ function serializeForm(config) {
     else value = element.value.trim();
 
     if (value === "" && !field.required) continue;
-    if (field.type === "number" && value !== "") value = Number(value);
+    if (field.type === "number" && value !== "") {
+      value = validarNumeroEnRango(value, field.min, field.max, field.label);
+    }
     if (field.type === "json") {
       try { value = JSON.parse(value); }
       catch { throw new Error(`El campo ${field.label} no contiene JSON válido.`); }
     }
     data[field.name] = value;
+  }
+
+  if (config.key === "turno") {
+    validarIntervaloTurno(data.inicio, data.fin);
   }
 
   if (config.key === "factura") {
@@ -552,6 +576,47 @@ function renderDetail(data) {
   }).join("")}</dl>`;
 }
 
+function renderHistoriaClinica(detail) {
+  const mascota = detail.mascota || {};
+  const historia = detail.historia || {};
+  const atenciones = [...(detail.atenciones || [])].sort((a, b) =>
+    String(b.fecha || "").localeCompare(String(a.fecha || "")),
+  );
+  const resumen = [
+    ["Especie", mascota.especie],
+    ["Raza", mascota.raza],
+    ["Sexo", titleCase(mascota.sexo)],
+    ["Peso actual", mascota.peso_kg ? `${mascota.peso_kg} kg` : null],
+    ["Nacimiento", formatDate(mascota.fecha_nacimiento, false)],
+    ["Microchip", mascota.microchip],
+  ];
+  const antecedentes = [
+    ["Antecedentes", historia.antecedentes],
+    ["Alergias", historia.alergias],
+    ["Observaciones", historia.observaciones],
+  ];
+  const grillaAtenciones = table(atenciones, [
+    { label: "Fecha", value: (item) => formatDate(item.fecha) },
+    { label: "Tipo", html: true, value: (item) => badge(item.tipo) },
+    { label: "Profesional", value: (item) => relatedLabel("profesionales", item.profesional_id) },
+    { label: "Motivo", value: "motivo" },
+    { label: "Peso", value: (item) => item.peso_kg ? `${item.peso_kg} kg` : "—" },
+    { label: "Temp.", value: (item) => item.temperatura_c ? `${item.temperatura_c} °C` : "—" },
+  ], "Todavía no hay atenciones en esta historia");
+
+  return `<div class="history-layout">
+    <section class="history-section">
+      <h3>Datos del paciente</h3>
+      <dl class="history-grid">${resumen.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(displayValue(value))}</dd></div>`).join("")}</dl>
+    </section>
+    <section class="history-section">
+      <h3>Antecedentes clínicos</h3>
+      <div class="history-notes">${antecedentes.map(([label, value]) => `<article><strong>${escapeHtml(label)}</strong><p>${escapeHtml(displayValue(value))}</p></article>`).join("")}</div>
+    </section>
+    <section class="history-section history-section-wide"><h3>Atenciones registradas</h3>${grillaAtenciones}</section>
+  </div>`;
+}
+
 function emptyState(title, copy = "Cree el primer registro para comenzar.") {
   return `<div class="empty-state"><span class="empty-mark">+</span><strong>${escapeHtml(title)}</strong><span>${escapeHtml(copy)}</span></div>`;
 }
@@ -620,7 +685,7 @@ function renderDashboard() {
         <h2>Salud animal con trazabilidad en cada paso.</h2>
         <p>Administre la atención clínica, las derivaciones y la custodia de muestras desde un mismo espacio sereno y preciso.</p>
         <div class="button-row">
-          ${actionButton("atencion", "Registrar atención", true)}
+          ${actionButton("turno", "Agendar atención", true)}
           ${actionButton("orden", "Nueva derivación")}
         </div>
       </div>
@@ -641,7 +706,7 @@ function renderDashboard() {
         { label: "", html: true, value: (item) => smallAction("order-detail", "Ver", `data-id="${item.id}"`) },
       ], "No hay derivaciones registradas")}</div>`)}
       ${panel("Accesos rápidos", "Operaciones frecuentes", `<div class="panel-body quick-actions">
-        <button class="quick-action" data-action="open-form" data-form="turno"><span class="quick-action-icon">+</span><span><strong>Programar turno</strong><small>Reservar horario profesional</small></span></button>
+        <button class="quick-action" data-action="open-form" data-form="turno"><span class="quick-action-icon">+</span><span><strong>Agendar atención</strong><small>Tipo, profesional y horario</small></span></button>
         <button class="quick-action" data-action="open-form" data-form="muestra"><span class="quick-action-icon">△</span><span><strong>Extraer muestra</strong><small>Iniciar la trazabilidad</small></span></button>
         <button class="quick-action" data-action="open-form" data-form="empaquetado"><span class="quick-action-icon">□</span><span><strong>Preparar remito</strong><small>Contenedor y precinto</small></span></button>
         <button class="quick-action" data-action="open-form" data-form="factura"><span class="quick-action-icon">$</span><span><strong>Emitir factura</strong><small>Atención y laboratorio</small></span></button>
@@ -690,8 +755,12 @@ function renderAtencion() {
     { label: "Horario", html: true, value: (item) => `<div class="primary-cell"><strong>${escapeHtml(formatDate(item.inicio))}</strong><span>hasta ${escapeHtml(formatDate(item.fin))}</span></div>` },
     { label: "Paciente", value: (item) => relatedLabel("mascotas", item.mascota_id) },
     { label: "Profesional", value: (item) => relatedLabel("profesionales", item.profesional_id) },
+    { label: "Tipo", html: true, value: (item) => badge(item.tipo || "consulta") },
     { label: "Motivo", value: "motivo" },
     { label: "Estado", html: true, value: (item) => badge(item.estado) },
+    { label: "Acción", html: true, value: (item) => item.estado === "atendido"
+      ? "Registrada"
+      : smallAction("appointment-attend", "Registrar", `data-id="${item.id}"`) },
   ], "No hay turnos programados");
   const attentionTable = table(attentions, [
     { label: "Atención", html: true, value: (item) => `<div class="primary-cell"><strong>${escapeHtml(titleCase(item.tipo))}</strong><span>${escapeHtml(formatDate(item.fecha))}</span></div>` },
@@ -708,17 +777,12 @@ function renderAtencion() {
     { label: "Próxima", value: (item) => formatDate(item.proxima_aplicacion, false) },
   ], "No hay vacunas aplicadas");
   root.innerHTML = `<div class="view-enter">
-    ${sectionIntro("Agenda y atención", "Organice turnos sin superposiciones, documente diagnósticos y mantenga al día el esquema sanitario.", `${actionButton("turno", "+ Turno")}${actionButton("aplicacionVacuna", "Aplicar vacuna")}${actionButton("atencion", "+ Atención", true)}`)}
-    <div class="card-grid" style="margin-bottom:18px">
-      <article class="action-card"><h3>Agenda médica</h3><p>${appointments.length} turnos registrados para los profesionales de la red.</p>${actionButton("turno", "Programar turno")}</article>
-      <article class="action-card"><h3>Atenciones</h3><p>Consultas, controles y urgencias vinculadas a la historia clínica.</p>${actionButton("atencion", "Registrar atención")}</article>
-      <article class="action-card"><h3>Vacunación</h3><p>Controle lote, vencimiento y fecha de la próxima dosis.</p>${actionButton("aplicacionVacuna", "Registrar aplicación")}</article>
-    </div>
+    ${sectionIntro("Agenda y atención", "Agende consultas, controles o urgencias eligiendo profesional, día y horario desde una única acción.", actionButton("turno", "Agendar atención", true))}
     <div class="dashboard-grid">
       ${panel("Próximos turnos", `${appointments.length} registros`, appointmentTable, searchField("Buscar turno"))}
       ${panel("Atenciones recientes", `${attentions.length} registros`, attentionTable, searchField("Buscar atención"))}
     </div>
-    <div style="margin-top:18px">${panel("Vacunas aplicadas", `${applications.length} registros`, applicationTable, searchField("Buscar aplicación"))}</div>
+    <div style="margin-top:18px">${panel("Vacunas aplicadas", `${applications.length} registros`, applicationTable, `<div class="panel-actions">${searchField("Buscar aplicación")}${actionButton("aplicacionVacuna", "Aplicar vacuna")}</div>`)}</div>
   </div>`;
 }
 
@@ -1012,6 +1076,20 @@ async function handleAction(button) {
     if (button.dataset.orderId) context.values = { orden_id: button.dataset.orderId };
     return openForm(button.dataset.form, context);
   }
+  if (action === "appointment-attend") {
+    const turno = findById("turnos", id);
+    if (!turno) return toast("No se encontró el turno seleccionado.", "error");
+    return openForm("atencion", {
+      values: {
+        turno_id: turno.id,
+        mascota_id: turno.mascota_id,
+        clinica_id: turno.clinica_id,
+        profesional_id: turno.profesional_id,
+        tipo: turno.tipo || "consulta",
+        motivo: turno.motivo,
+      },
+    });
+  }
   if (action === "client-edit") return openForm("cliente", { id, values: findById("clientes", id) });
   if (action === "client-detail") {
     try {
@@ -1035,6 +1113,7 @@ async function handleAction(button) {
       const detail = await api(`/mascotas/${id}/historia-clinica`);
       const actions = `<button class="button button-primary" data-action="history-edit" data-id="${id}">Editar historia</button>`;
       openDrawer(`Historia de ${detail.mascota.nombre}`, detail, "Historia clínica");
+      $("#drawer-content").innerHTML = renderHistoriaClinica(detail);
       $("#drawer-content").insertAdjacentHTML("afterbegin", `<div class="button-row" style="margin-bottom:16px">${actions}</div>`);
     } catch (error) { toast(error.message, "error"); }
     return;

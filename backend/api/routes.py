@@ -94,6 +94,14 @@ def serializar_lista(entidades: list[Any]) -> list[dict[str, Any]]:
     return [serializar(entidad) for entidad in entidades]
 
 
+def serializar_atencion(atencion: AtencionVeterinaria) -> dict[str, Any]:
+    """Incluye el paciente para que los selectores clínicos sean comprensibles."""
+
+    resultado = serializar(atencion)
+    resultado["mascota_id"] = str(atencion.historia_clinica.mascota_id)
+    return resultado
+
+
 def serializar_orden(orden: OrdenDerivacion) -> dict[str, Any]:
     solicitudes = []
     for solicitud in orden.solicitudes_analisis:
@@ -329,10 +337,14 @@ def listar_atenciones(
     clinica_id: UUID | None = None,
     sesion: Session = Depends(obtener_sesion),
 ):
-    consulta = select(AtencionVeterinaria).order_by(AtencionVeterinaria.fecha.desc())
+    consulta = (
+        select(AtencionVeterinaria)
+        .options(selectinload(AtencionVeterinaria.historia_clinica))
+        .order_by(AtencionVeterinaria.fecha.desc())
+    )
     if clinica_id:
         consulta = consulta.where(AtencionVeterinaria.clinica_id == clinica_id)
-    return serializar_lista(sesion.scalars(consulta).all())
+    return [serializar_atencion(atencion) for atencion in sesion.scalars(consulta).all()]
 
 
 @router.post("/vacunas/aplicaciones", status_code=201, tags=["Vacunación"])

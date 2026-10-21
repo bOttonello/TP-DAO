@@ -1118,6 +1118,76 @@ tbody tr:last-child td {
   line-height: 1.55;
 }
 
+.history-layout,
+.history-notes {
+  display: grid;
+  gap: 16px;
+}
+
+.history-section {
+  padding: 16px;
+  border: 1px solid var(--ink-100);
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.history-section h3 {
+  margin: 0 0 13px;
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.history-grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.history-grid div,
+.history-notes article {
+  padding: 11px;
+  border-radius: 9px;
+  background: var(--sage-50);
+}
+
+.history-grid dt {
+  color: var(--ink-500);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.history-grid dd {
+  margin: 4px 0 0;
+  color: var(--ink-800);
+  font-size: 11px;
+}
+
+.history-notes article strong {
+  color: var(--sage-800);
+  font-size: 10px;
+}
+
+.history-notes article p {
+  margin: 6px 0 0;
+  color: var(--ink-700);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.history-section .table-wrap {
+  border: 1px solid var(--ink-100);
+  border-radius: 9px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .timeline {
   margin-top: 20px;
   display: grid;

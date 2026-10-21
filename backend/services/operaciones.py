@@ -243,6 +243,15 @@ class ServicioPatitas:
     # Agenda, atención y vacunación
     # ------------------------------------------------------------------
     def programar_turno(self, datos: TurnoCrear) -> Turno:
+        ahora_local = datetime.now().astimezone()
+        inicio = datos.inicio
+        if inicio.tzinfo is None:
+            inicio = inicio.replace(tzinfo=ahora_local.tzinfo)
+        else:
+            inicio = inicio.astimezone(ahora_local.tzinfo)
+        if inicio < ahora_local:
+            raise ConflictoDeNegocio("No se puede programar un turno en el pasado")
+
         profesional = self.sesion.get(
             ProfesionalVeterinario, datos.profesional_id, with_for_update=True
         )
@@ -274,7 +283,11 @@ class ServicioPatitas:
                 "El profesional ya tiene un turno que se superpone con ese horario"
             )
 
-        turno = Turno(**datos.model_dump(mode="python"), estado=EstadoTurno.PROGRAMADO)
+        turno = Turno(
+            **datos.model_dump(mode="python", exclude={"tipo"}),
+            tipo=TipoAtencion(datos.tipo),
+            estado=EstadoTurno.PROGRAMADO,
+        )
         self.sesion.add(turno)
         self.sesion.flush()
         return turno

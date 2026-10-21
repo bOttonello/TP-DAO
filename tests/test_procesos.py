@@ -3,14 +3,15 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.core.database import obtener_sesion
 from backend.core.exceptions import ConflictoDeNegocio
 from backend.main import app
-from backend.models import EventoCustodia, OrdenAnalisis
-from backend.models.enums import EstadoMuestra, EstadoRemito
+from backend.models import EventoCustodia, OrdenAnalisis, Turno
+from backend.models.enums import EstadoMuestra, EstadoRemito, TipoAtencion
 from backend.schemas import (
     AnalisisCrear,
     AtencionCrear,
@@ -198,11 +199,13 @@ def test_impide_superposicion_de_turnos(sesion: Session) -> None:
             clinica_id=datos["clinica"].id,
             profesional_id=datos["profesional"].id,
             mascota_id=datos["mascota"].id,
+            tipo="control",
             inicio=inicio,
             fin=inicio + timedelta(minutes=30),
             motivo="Control",
         )
-        datos["servicio"].programar_turno(base)
+        turno = datos["servicio"].programar_turno(base)
+        assert turno.tipo == TipoAtencion.CONTROL
         with pytest.raises(ConflictoDeNegocio, match="superpone"):
             datos["servicio"].programar_turno(
                 TurnoCrear(
@@ -211,6 +214,72 @@ def test_impide_superposicion_de_turnos(sesion: Session) -> None:
                     fin=inicio + timedelta(minutes=45),
                 )
             )
+
+
+def test_impide_programar_un_turno_en_el_pasado(sesion: Session) -> None:
+    with sesion.begin():
+        datos = preparar_escenario(sesion, despachar=False)
+        inicio = datetime.now(UTC) - timedelta(days=1)
+        cantidad_antes = len(sesion.scalars(select(Turno)).all())
+
+        with pytest.raises(ConflictoDeNegocio, match="pasado"):
+            datos["servicio"].programar_turno(
+                TurnoCrear(
+                    clinica_id=datos["clinica"].id,
+                    profesional_id=datos["profesional"].id,
+                    mascota_id=datos["mascota"].id,
+                    tipo="consulta",
+                    inicio=inicio,
+                    fin=inicio + timedelta(minutes=30),
+                    motivo="Control fuera de fecha",
+                )
+            )
+
+        assert len(sesion.scalars(select(Turno)).all()) == cantidad_antes
+
+
+def test_valida_peso_y_rango_de_temperatura_en_atencion(sesion: Session) -> None:
+    with sesion.begin():
+        datos = preparar_escenario(sesion, despachar=False)
+        base = {
+            "mascota_id": datos["mascota"].id,
+            "clinica_id": datos["clinica"].id,
+            "profesional_id": datos["profesional"].id,
+            "tipo": "consulta",
+            "motivo": "Control térmico",
+        }
+
+        assert AtencionCrear(**base, temperatura_c=Decimal("24")).temperatura_c == 24
+        assert AtencionCrear(**base, temperatura_c=Decimal("45")).temperatura_c == 45
+        with pytest.raises(ValidationError):
+            AtencionCrear(**base, temperatura_c=Decimal("23.9"))
+        with pytest.raises(ValidationError):
+            AtencionCrear(**base, temperatura_c=Decimal("45.1"))
+        with pytest.raises(ValidationError):
+            AtencionCrear(**base, peso_kg=Decimal("-1"))
+
+
+def test_listado_de_atenciones_incluye_paciente_para_facturacion(
+    sesion: Session,
+) -> None:
+    with sesion.begin():
+        datos = preparar_escenario(sesion, despachar=False)
+        atencion_id = str(datos["atencion"].id)
+        mascota_id = str(datos["mascota"].id)
+
+    def reemplazar_sesion():
+        yield sesion
+
+    app.dependency_overrides[obtener_sesion] = reemplazar_sesion
+    try:
+        with TestClient(app) as cliente:
+            respuesta = cliente.get("/api/atenciones")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 200
+    atencion = next(item for item in respuesta.json() if item["id"] == atencion_id)
+    assert atencion["mascota_id"] == mascota_id
 
 
 def test_atencion_conserva_alerta_de_vacuna_obligatoria(sesion: Session) -> None:

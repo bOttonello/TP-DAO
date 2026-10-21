@@ -122,6 +122,7 @@ class TurnoCrear(EsquemaBase):
     clinica_id: UUID
     profesional_id: UUID
     mascota_id: UUID
+    tipo: Literal["consulta", "control", "urgencia"] = "consulta"
     inicio: datetime
     fin: datetime
     motivo: str = Field(min_length=2, max_length=300)
@@ -144,7 +145,7 @@ class AtencionCrear(EsquemaBase):
     diagnostico: str | None = None
     tratamiento: str | None = None
     peso_kg: Decimal | None = Field(default=None, gt=0)
-    temperatura_c: Decimal | None = Field(default=None, ge=30, le=45)
+    temperatura_c: Decimal | None = Field(default=None, ge=24, le=45)
     observaciones: str | None = None
 
 
