@@ -764,7 +764,7 @@ function renderAtencion() {
   ], "No hay turnos programados");
   const attentionTable = table(attentions, [
     { label: "Atención", html: true, value: (item) => `<div class="primary-cell"><strong>${escapeHtml(titleCase(item.tipo))}</strong><span>${escapeHtml(formatDate(item.fecha))}</span></div>` },
-    { label: "Paciente", value: (item) => relatedLabel("mascotas", item.mascota_id || findById("mascotas", item.mascota_id)?.id) },
+    { label: "Paciente", value: (item) => relatedLabel("mascotas", item.mascota_id) },
     { label: "Clínica", value: (item) => relatedLabel("clinicas", item.clinica_id) },
     { label: "Motivo", value: "motivo" },
     { label: "Detalle", html: true, value: (item) => smallAction("generic-detail", "Ver", `data-source="atenciones" data-id="${item.id}"`) },

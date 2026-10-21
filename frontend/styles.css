@@ -1166,7 +1166,7 @@ tbody tr:last-child td {
 }
 
 .history-notes article strong {
-  color: var(--sage-800);
+  color: var(--sage-700);
   font-size: 10px;
 }
 
@@ -1367,6 +1367,8 @@ tbody tr:last-child td {
   .modal { max-height: 94vh; border-radius: 20px 20px 0 0; }
   .repeat-item { grid-template-columns: 1fr 1fr; }
   .detail-row { grid-template-columns: 1fr; gap: 4px; }
+  .history-grid { grid-template-columns: 1fr; }
+  .panel-actions { width: 100%; align-items: stretch; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {
