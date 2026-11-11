@@ -173,6 +173,15 @@ class AplicacionVacunaCrear(EsquemaBase):
 
     @model_validator(mode="after")
     def validar_fechas(self) -> "AplicacionVacunaCrear":
+        ahora_local = datetime.now().astimezone()
+        aplicada_en = self.aplicada_en
+        if aplicada_en.tzinfo is None:
+            aplicada_en = aplicada_en.replace(tzinfo=ahora_local.tzinfo)
+        else:
+            aplicada_en = aplicada_en.astimezone(ahora_local.tzinfo)
+        if aplicada_en > ahora_local:
+            raise ValueError("La fecha de aplicación no puede estar en el futuro")
+
         fecha_aplicacion = self.aplicada_en.date()
         if (
             self.fecha_vencimiento_lote is not None

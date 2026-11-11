@@ -15,7 +15,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
+    select,
 )
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.core.database import Base
@@ -224,3 +227,28 @@ class ResultadoAnalisis(IdentificadorMixin, MarcaTemporalMixin, Base):
     firmado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     orden_analisis: Mapped[OrdenAnalisis] = relationship(back_populates="resultado")
+
+
+def _validar_estado_muestra_trazable(
+    _mapper: object, connection: object, muestra: MuestraBiologica
+) -> None:
+    historial = sa_inspect(muestra).attrs.estado_actual.history
+    if not historial.has_changes() or not historial.added:
+        return
+
+    # La importación diferida evita el ciclo entre laboratorio y transporte.
+    from backend.models.transporte import EventoCustodia
+
+    ultimo_estado = connection.execute(
+        select(EventoCustodia.estado_nuevo)
+        .where(EventoCustodia.muestra_id == muestra.id)
+        .order_by(EventoCustodia.secuencia.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if ultimo_estado != historial.added[0]:
+        raise ValueError(
+            "El estado de la muestra sólo puede cambiar mediante un evento de custodia"
+        )
+
+
+event.listen(MuestraBiologica, "before_update", _validar_estado_muestra_trazable)

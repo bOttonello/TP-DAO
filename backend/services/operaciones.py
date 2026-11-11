@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID, uuid4
 
@@ -313,6 +313,8 @@ class ServicioPatitas:
                 .where(
                     AplicacionVacuna.mascota_id == mascota.id,
                     AplicacionVacuna.vacuna_id == vacuna.id,
+                    AplicacionVacuna.fecha_aplicacion
+                    < datetime.combine(en_fecha + timedelta(days=1), time.min),
                 )
                 .order_by(AplicacionVacuna.fecha_aplicacion.desc())
                 .limit(1)
@@ -321,11 +323,13 @@ class ServicioPatitas:
             vencida_desde: str | None = None
             if ultima is None:
                 motivo = "nunca_aplicada"
-            elif vacuna.intervalo_refuerzo_dias:
-                vencimiento = ultima.fecha_aplicacion.date() + timedelta(
-                    days=vacuna.intervalo_refuerzo_dias
-                )
-                if vencimiento <= en_fecha:
+            else:
+                vencimiento = ultima.proxima_aplicacion
+                if vencimiento is None and vacuna.intervalo_refuerzo_dias:
+                    vencimiento = ultima.fecha_aplicacion.date() + timedelta(
+                        days=vacuna.intervalo_refuerzo_dias
+                    )
+                if vencimiento is not None and vencimiento <= en_fecha:
                     motivo = "refuerzo_vencido"
                     vencida_desde = vencimiento.isoformat()
             if motivo:
@@ -365,6 +369,20 @@ class ServicioPatitas:
                 or turno.clinica_id != datos.clinica_id
             ):
                 raise ConflictoDeNegocio("El turno no coincide con los datos de la atención")
+            if turno.tipo != TipoAtencion(datos.tipo):
+                raise ConflictoDeNegocio(
+                    "El tipo de atención no coincide con el tipo reservado en el turno"
+                )
+            ahora_local = datetime.now().astimezone()
+            inicio_turno = turno.inicio
+            if inicio_turno.tzinfo is None:
+                inicio_turno = inicio_turno.replace(tzinfo=ahora_local.tzinfo)
+            else:
+                inicio_turno = inicio_turno.astimezone(ahora_local.tzinfo)
+            if inicio_turno > ahora_local:
+                raise ConflictoDeNegocio(
+                    "No se puede registrar la atención antes del inicio del turno"
+                )
             if turno.estado in {EstadoTurno.CANCELADO, EstadoTurno.AUSENTE, EstadoTurno.ATENDIDO}:
                 raise ConflictoDeNegocio("El turno no está disponible para registrar atención")
             turno.estado = EstadoTurno.ATENDIDO
@@ -416,6 +434,12 @@ class ServicioPatitas:
             and datos.aplicada_en.date() < mascota.fecha_nacimiento
         ):
             raise ConflictoDeNegocio("La vacuna no puede anteceder al nacimiento")
+        if mascota.fecha_nacimiento is not None:
+            edad_dias = (datos.aplicada_en.date() - mascota.fecha_nacimiento).days
+            if edad_dias < vacuna.edad_minima_dias:
+                raise ConflictoDeNegocio(
+                    "La mascota todavía no alcanza la edad mínima para esta vacuna"
+                )
         aplicacion = AplicacionVacuna(
             vacuna_id=vacuna.id,
             mascota_id=mascota.id,
@@ -572,23 +596,25 @@ class ServicioPatitas:
                 EventoCustodia.muestra_id == muestra.id
             )
         )
-        muestra.estado_actual = EstadoMuestra(transicion.estado_nuevo)
-        self.sesion.add(
-            EventoCustodia(
-                cadena_custodia_id=muestra.cadena_custodia.id,
-                muestra_id=muestra.id,
-                envio_id=envio_id,
-                secuencia=int(secuencia or 0) + 1,
-                tipo_evento=tipo,
-                estado_anterior=EstadoMuestra(transicion.estado_anterior),
-                estado_nuevo=EstadoMuestra(transicion.estado_nuevo),
-                ocurrido_en=transicion.ocurrida_en,
-                actor=actor,
-                ubicacion=ubicacion,
-                temperatura_c=temperatura_c,
-                observaciones=observaciones or transicion.detalle,
-            )
+        evento = EventoCustodia(
+            cadena_custodia_id=muestra.cadena_custodia.id,
+            muestra_id=muestra.id,
+            envio_id=envio_id,
+            secuencia=int(secuencia or 0) + 1,
+            tipo_evento=tipo,
+            estado_anterior=EstadoMuestra(transicion.estado_anterior),
+            estado_nuevo=EstadoMuestra(transicion.estado_nuevo),
+            ocurrido_en=transicion.ocurrida_en,
+            actor=actor,
+            ubicacion=ubicacion,
+            temperatura_c=temperatura_c,
+            observaciones=observaciones or transicion.detalle,
         )
+        self.sesion.add(evento)
+        # Primero se persiste el evento. Recién entonces el estado actual puede
+        # reflejarlo, tanto ante SQLAlchemy como ante los triggers de SQLite.
+        self.sesion.flush()
+        muestra.estado_actual = EstadoMuestra(transicion.estado_nuevo)
 
     def _agregar_evento_remito(
         self,
@@ -605,18 +631,19 @@ class ServicioPatitas:
                 EventoRemito.remito_id == remito.id
             )
         )
-        self.sesion.add(
-            EventoRemito(
-                remito_id=remito.id,
-                secuencia=int(secuencia or 0) + 1,
-                tipo_evento=tipo,
-                estado_anterior=estado_anterior,
-                estado_nuevo=estado_nuevo,
-                ocurrido_en=ahora_utc(),
-                actor=actor,
-                observaciones=observaciones,
-            )
+        evento = EventoRemito(
+            remito_id=remito.id,
+            secuencia=int(secuencia or 0) + 1,
+            tipo_evento=tipo,
+            estado_anterior=estado_anterior,
+            estado_nuevo=estado_nuevo,
+            ocurrido_en=ahora_utc(),
+            actor=actor,
+            observaciones=observaciones,
         )
+        self.sesion.add(evento)
+        self.sesion.flush()
+        remito.estado = estado_nuevo
 
     def empaquetar_muestras(self, datos: EmpaquetadoCrear) -> RemitoBiologico:
         contenedor = self.sesion.get(Contenedor, datos.contenedor_id, with_for_update=True)
@@ -693,7 +720,6 @@ class ServicioPatitas:
         self.sesion.flush()
         maquina_remito = CicloVidaRemito(remito.estado.value)
         cambio_remito = maquina_remito.emitir()
-        remito.estado = EstadoRemito(cambio_remito.estado_nuevo)
         self._agregar_evento_remito(
             remito,
             tipo=TipoEventoRemito.EMISION,
@@ -762,7 +788,6 @@ class ServicioPatitas:
         )
         self.sesion.add(envio)
         self.sesion.flush()
-        remito.estado = EstadoRemito(cambio_remito.estado_nuevo)
         remito.fecha_despacho = salida
         remito.contenedor.estado = EstadoContenedor.EN_TRANSITO
         self._agregar_evento_remito(
@@ -918,7 +943,6 @@ class ServicioPatitas:
         cambio_remito = CicloVidaRemito(remito.estado.value).registrar_recepcion(
             aceptado=viable
         )
-        remito.estado = EstadoRemito(cambio_remito.estado_nuevo)
         remito.precinto.estado = estado_precinto
         remito.precinto.verificado_en = ahora_utc()
         remito.envio.estado = EstadoEnvio.ENTREGADO if viable else EstadoEnvio.CON_INCIDENCIA
@@ -948,6 +972,9 @@ class ServicioPatitas:
             )
             muestra.fecha_recepcion = ahora_utc()
             muestra.motivo_rechazo = motivo
+            # El trigger que valida un rechazo consulta el motivo persistido.
+            # Se guarda antes del evento sin modificar todavía el estado.
+            self.sesion.flush()
             if viable:
                 muestra.orden.estado = EstadoOrden.RECIBIDA
             self._agregar_evento_muestra(

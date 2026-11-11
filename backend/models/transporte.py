@@ -15,7 +15,10 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     event,
+    select,
+    text,
 )
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.core.database import Base
@@ -88,6 +91,12 @@ class RemitoBiologico(IdentificadorMixin, MarcaTemporalMixin, Base):
         ),
         Index("ix_remitos_origen_emision", "clinica_origen_id", "fecha_emision"),
         Index("ix_remitos_estado_emision", "estado", "fecha_emision"),
+        Index(
+            "uq_remitos_contenedor_activo",
+            "contenedor_id",
+            unique=True,
+            sqlite_where=text("estado IN ('borrador', 'emitido', 'en_transito')"),
+        ),
     )
 
     numero: Mapped[str] = mapped_column(String(60), unique=True, index=True)
@@ -289,7 +298,27 @@ def _evitar_mutacion_historial(_mapper: object, _connection: object, target: obj
     raise ValueError(f"{type(target).__name__} es inmutable; agregá un nuevo evento")
 
 
+def _validar_estado_remito_trazable(
+    _mapper: object, connection: object, remito: RemitoBiologico
+) -> None:
+    historial = sa_inspect(remito).attrs.estado.history
+    if not historial.has_changes() or not historial.added:
+        return
+
+    ultimo_estado = connection.execute(
+        select(EventoRemito.estado_nuevo)
+        .where(EventoRemito.remito_id == remito.id)
+        .order_by(EventoRemito.secuencia.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if ultimo_estado != historial.added[0]:
+        raise ValueError(
+            "El estado del remito sólo puede cambiar mediante un evento de remito"
+        )
+
+
 event.listen(EventoCustodia, "before_update", _evitar_mutacion_historial)
 event.listen(EventoCustodia, "before_delete", _evitar_mutacion_historial)
 event.listen(EventoRemito, "before_update", _evitar_mutacion_historial)
 event.listen(EventoRemito, "before_delete", _evitar_mutacion_historial)
+event.listen(RemitoBiologico, "before_update", _validar_estado_remito_trazable)

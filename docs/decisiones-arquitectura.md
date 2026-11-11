@@ -60,11 +60,15 @@ sin duplicar estados ni dispersar el mapa de transiciones.
 - No existe una mascota sin cliente responsable.
 - No se aceptan turnos cuyo intervalo se superponga con otro turno activo del mismo profesional.
 - Al registrar una atención se calcula y conserva qué vacunas obligatorias están pendientes.
+- Las aplicaciones futuras no alteran el esquema y la próxima dosis indicada
+  prevalece sobre el intervalo general de la vacuna.
 - Un resultado solo puede cargarse para una muestra recibida y viable.
 - Un precinto roto provoca rechazo; ese camino es terminal.
 - Cada transición de una muestra genera un `EventoCustodia` en la misma transacción.
 - Las transferencias intermedias agregan eventos `EN_TRANSITO -> EN_TRANSITO`, conservando custodio, ubicación y temperatura sin inventar un cambio de estado.
 - `EventoCustodia` es append-only: SQLAlchemy bloquea modificaciones y SQLite instala un trigger que rechaza `UPDATE` y `DELETE`.
+- El estado actual también está protegido: sólo puede coincidir con el último
+  evento válido de la muestra o del remito.
 - Los importes de factura se calculan en el servidor a partir de sus componentes.
 
 ## Reportes implementados

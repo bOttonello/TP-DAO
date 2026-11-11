@@ -96,6 +96,8 @@ mediante una clave única.
 - Dos turnos activos del mismo profesional no se pueden superponer.
 - Una atención guarda una foto del estado de las vacunas obligatorias en ese
   momento, incluso si el catálogo cambia después.
+- Una aplicación de vacuna no puede registrarse en el futuro ni antes de la
+  edad mínima, y el control respeta la próxima dosis indicada.
 - Toda orden de derivación debe solicitar al menos un análisis.
 - Una muestra sólo se puede incluir una vez y debe respetar el tipo solicitado.
 - Un contenedor no puede superar su capacidad ni utilizarse en dos remitos
@@ -105,8 +107,15 @@ mediante una clave única.
   resultado.
 - Cada transición crea un evento nuevo; los eventos existentes no se editan ni
   eliminan.
+- El estado actual de una muestra o remito tampoco puede adelantarse al último
+  evento de su historial, ni desde SQLAlchemy ni mediante SQL directo.
 - Los importes de la factura se recalculan en el servidor, sin confiar en un
   total enviado por el cliente.
+- Cuando una atención nace de un turno, deben coincidir mascota, clínica,
+  profesional y tipo; además, el turno debe haber comenzado.
+
+La trazabilidad del remito puede consultarse mediante
+`GET /api/remitos/{remito_id}/trazabilidad`.
 
 Estas reglas se aplican en el servicio de dominio y, para las invariantes más
 críticas, también en SQLite mediante restricciones, índices parciales y triggers.
@@ -177,10 +186,10 @@ comunica con `/api` en el mismo origen.
 
 ## Pruebas y calidad
 
-Las pruebas usan SQLite en memoria para ser rápidas y aisladas. Cubren los
-patrones, las transiciones válidas e inválidas, el rechazo por precinto roto,
-la agenda, la vacunación, la trazabilidad, el flujo exitoso y los cinco
-reportes.
+Las pruebas unitarias usan SQLite en memoria para ser rápidas y aisladas. Una
+suite integrada adicional crea bases temporales mediante Alembic y verifica el
+ciclo completo de upgrade/downgrade, los triggers, la agenda, la vacunación, la
+trazabilidad, el flujo exitoso y los cinco reportes.
 
 ```powershell
 pytest

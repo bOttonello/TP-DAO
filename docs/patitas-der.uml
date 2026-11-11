@@ -1,0 +1,404 @@
+@startuml Patitas_DER
+
+' Patitas - DER / diagrama de clases persistentes
+' Optimizado para exportar como imagen y pegar en el informe.
+
+title Patitas — Diagrama Entidad-Relación
+
+top to bottom direction
+hide methods
+hide circle
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam linetype ortho
+skinparam nodesep 28
+skinparam ranksep 38
+skinparam padding 6
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam titleFontName Arial
+skinparam titleFontSize 24
+skinparam titleFontStyle bold
+skinparam ArrowColor #46635A
+skinparam ArrowThickness 1.2
+skinparam packageStyle rectangle
+skinparam packageBorderColor #AABCB6
+skinparam packageFontColor #23483D
+skinparam packageFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam classBorderColor #66857A
+skinparam classFontColor #17372E
+skinparam classAttributeFontColor #304B43
+skinparam classBackgroundColor #F8FBFA
+skinparam classStereotypeFontColor #60756E
+
+package "Núcleo clínico" as PKG_CLINICO #EAF4F0 {
+  class Cliente {
+    + id: integer <<PK>>
+    --
+    nombre: texto
+    apellido: texto
+    numero_documento: texto
+    email: texto
+    telefono: texto
+    activo: booleano
+  }
+
+  class Mascota {
+    + id: integer <<PK>>
+    # cliente_id: integer <<FK>>
+    --
+    nombre: texto
+    especie: texto
+    raza: texto
+    fecha_nacimiento: fecha
+    peso_kg: decimal
+    activo: booleano
+  }
+
+  class "Historia Clínica" as HistoriaClinica {
+    + id: integer <<PK>>
+    # mascota_id: integer <<FK>>
+    --
+    fecha_apertura: fecha y hora
+    antecedentes: texto
+    alergias: texto
+    observaciones: texto
+  }
+
+  class "Clínica Veterinaria" as ClinicaVeterinaria {
+    + id: integer <<PK>>
+    --
+    nombre: texto
+    codigo: texto
+    cuit: texto
+    direccion: texto
+    activa: booleano
+  }
+
+  class "Profesional Veterinario" as ProfesionalVeterinario {
+    + id: integer <<PK>>
+    # clinica_id: integer <<FK>>
+    --
+    nombre: texto
+    apellido: texto
+    matricula: texto
+    especialidad: texto
+    activo: booleano
+  }
+
+  class Turno {
+    + id: integer <<PK>>
+    # clinica_id: integer <<FK>>
+    # profesional_id: integer <<FK>>
+    # mascota_id: integer <<FK>>
+    --
+    tipo: enumerado
+    inicio: fecha y hora
+    fin: fecha y hora
+    estado: enumerado
+    motivo: texto
+  }
+
+  class "Atención Veterinaria" as AtencionVeterinaria {
+    + id: integer <<PK>>
+    # historia_clinica_id: integer <<FK>>
+    # turno_id: integer <<FK>>
+    # clinica_id: integer <<FK>>
+    # profesional_id: integer <<FK>>
+    --
+    fecha: fecha y hora
+    tipo: enumerado
+    motivo: texto
+    peso_kg: decimal
+    temperatura_c: decimal
+    esquema_vacunacion_al_dia: booleano
+  }
+}
+
+package "Vacunación" as PKG_VACUNACION #EEF6E8 {
+  class Vacuna {
+    + id: integer <<PK>>
+    --
+    nombre: texto
+    especie_objetivo: texto
+    dosis_ml: decimal
+    obligatoria: booleano
+    activa: booleano
+  }
+
+  class "Aplicación de Vacuna" as AplicacionVacuna {
+    + id: integer <<PK>>
+    # vacuna_id: integer <<FK>>
+    # mascota_id: integer <<FK>>
+    # atencion_id: integer <<FK>>
+    # profesional_id: integer <<FK>>
+    --
+    fecha_aplicacion: fecha y hora
+    dosis_ml: decimal
+    lote: texto
+    proxima_aplicacion: fecha
+  }
+}
+
+package "Derivación y laboratorio" as PKG_LABORATORIO #EAF1F7 {
+  class "Laboratorio Central" as LaboratorioCentral {
+    + id: integer <<PK>>
+    --
+    nombre: texto
+    codigo: texto
+    direccion: texto
+    activo: booleano
+    clave_singleton: texto
+  }
+
+  class Analisis {
+    + id: integer <<PK>>
+    # laboratorio_id: integer <<FK>>
+    --
+    codigo: texto
+    nombre: texto
+    tipo_muestra: texto
+    precio: decimal
+    activo: booleano
+  }
+
+  class "Orden de Derivación" as OrdenDerivacion {
+    + id: integer <<PK>>
+    # atencion_id: integer <<FK>>
+    # laboratorio_id: integer <<FK>>
+    # profesional_solicitante_id: integer <<FK>>
+    --
+    numero: texto
+    fecha_emision: fecha y hora
+    estado: enumerado
+    prioridad: enumerado
+    indicaciones: texto
+  }
+
+  class "Análisis Solicitado" as OrdenAnalisis {
+    + id: integer <<PK>>
+    # orden_id: integer <<FK>>
+    # analisis_id: integer <<FK>>
+    # muestra_id: integer <<FK>>
+    --
+    estado: enumerado
+  }
+
+  class "Resultado de Análisis" as ResultadoAnalisis {
+    + id: integer <<PK>>
+    # orden_analisis_id: integer <<FK>>
+    --
+    fecha_resultado: fecha y hora
+    valores: JSON
+    conclusion: texto
+    validado_por: texto
+    firmado_en: fecha y hora
+  }
+}
+
+package "Transporte y trazabilidad" as PKG_TRANSPORTE #F7F1E8 {
+  class "Muestra Biológica" as MuestraBiologica {
+    + id: integer <<PK>>
+    # orden_id: integer <<FK>>
+    # remito_id: integer <<FK>>
+    --
+    codigo: texto
+    tipo: texto
+    estado_actual: enumerado
+    fecha_extraccion: fecha y hora
+    fecha_recepcion: fecha y hora
+    motivo_rechazo: texto
+  }
+
+  class "Cadena de Custodia" as CadenaCustodia {
+    + id: integer <<PK>>
+    # muestra_id: integer <<FK>>
+    --
+    abierta_en: fecha y hora
+    cerrada_en: fecha y hora
+  }
+
+  class "Evento de Custodia" as EventoCustodia {
+    + id: integer <<PK>>
+    # cadena_custodia_id: integer <<FK>>
+    # muestra_id: integer <<FK>>
+    # envio_id: integer <<FK>>
+    --
+    secuencia: integer
+    tipo_evento: texto
+    estado_anterior: enumerado
+    estado_nuevo: enumerado
+    ocurrido_en: fecha y hora
+    actor: texto
+    temperatura_c: decimal
+  }
+
+  class Contenedor {
+    + id: integer <<PK>>
+    --
+    codigo: texto
+    capacidad_muestras: integer
+    temperatura_min_c: decimal
+    temperatura_max_c: decimal
+    estado: enumerado
+  }
+
+  class "Precinto Sanitario" as PrecintoSanitario {
+    + id: integer <<PK>>
+    --
+    codigo: texto
+    estado: enumerado
+    aplicado_en: fecha y hora
+    verificado_en: fecha y hora
+  }
+
+  class "Remito Biológico" as RemitoBiologico {
+    + id: integer <<PK>>
+    # contenedor_id: integer <<FK>>
+    # precinto_id: integer <<FK>>
+    # clinica_origen_id: integer <<FK>>
+    # laboratorio_destino_id: integer <<FK>>
+    --
+    numero: texto
+    fecha_emision: fecha y hora
+    fecha_despacho: fecha y hora
+    estado: enumerado
+  }
+
+  class Envio {
+    + id: integer <<PK>>
+    # remito_id: integer <<FK>>
+    --
+    codigo_seguimiento: texto
+    transportista: texto
+    fecha_salida: fecha y hora
+    fecha_entrega: fecha y hora
+    estado: enumerado
+  }
+
+  class "Recepción de Laboratorio" as RecepcionLaboratorio {
+    + id: integer <<PK>>
+    # remito_id: integer <<FK>>
+    # envio_id: integer <<FK>>
+    # laboratorio_id: integer <<FK>>
+    --
+    recibido_en: fecha y hora
+    estado_precinto: enumerado
+    temperatura_recepcion_c: decimal
+    muestra_viable: booleano
+  }
+
+  class "Evento de Remito" as EventoRemito {
+    + id: integer <<PK>>
+    # remito_id: integer <<FK>>
+    --
+    secuencia: integer
+    tipo_evento: texto
+    estado_anterior: enumerado
+    estado_nuevo: enumerado
+    ocurrido_en: fecha y hora
+    actor: texto
+  }
+}
+
+package "Facturación" as PKG_FACTURACION #F3EDF6 {
+  class Factura {
+    + id: integer <<PK>>
+    # cliente_id: integer <<FK>>
+    # clinica_id: integer <<FK>>
+    # atencion_id: integer <<FK>>
+    # orden_derivacion_id: integer <<FK>>
+    --
+    numero: texto
+    fecha_emision: fecha y hora
+    estado: enumerado
+    subtotal: decimal
+    descuento: decimal
+    total: decimal
+  }
+
+  class "Componente de Atención" as ComponenteAtencion {
+    + id: integer <<PK>>
+    # factura_id: integer <<FK>>
+    # atencion_id: integer <<FK>>
+    # orden_analisis_id: integer <<FK>>
+    --
+    tipo: enumerado
+    descripcion: texto
+    cantidad: decimal
+    precio_unitario: decimal
+    subtotal: decimal
+  }
+}
+
+' Núcleo clínico
+Cliente "1" -- "0..*" Mascota : responsable
+Mascota "1" -- "1" HistoriaClinica : posee
+Mascota "1" -- "0..*" Turno
+ClinicaVeterinaria "1" -- "0..*" ProfesionalVeterinario
+ClinicaVeterinaria "1" -- "0..*" Turno
+ProfesionalVeterinario "1" -- "0..*" Turno
+HistoriaClinica "1" -- "0..*" AtencionVeterinaria
+Turno "1" -- "0..1" AtencionVeterinaria : genera
+ClinicaVeterinaria "1" -- "0..*" AtencionVeterinaria
+ProfesionalVeterinario "1" -- "0..*" AtencionVeterinaria
+
+' Vacunación
+Mascota "1" -- "0..*" AplicacionVacuna
+Vacuna "1" -- "0..*" AplicacionVacuna
+AtencionVeterinaria "1" -- "0..*" AplicacionVacuna
+ProfesionalVeterinario "1" -- "0..*" AplicacionVacuna
+
+' Derivación y laboratorio
+AtencionVeterinaria "1" -- "0..*" OrdenDerivacion
+ProfesionalVeterinario "1" -- "0..*" OrdenDerivacion : solicita
+LaboratorioCentral "1" -- "0..*" Analisis
+LaboratorioCentral "1" -- "0..*" OrdenDerivacion
+OrdenDerivacion "1" -- "1..*" OrdenAnalisis
+Analisis "1" -- "0..*" OrdenAnalisis
+OrdenAnalisis "1" -- "0..1" ResultadoAnalisis
+
+' Transporte y trazabilidad
+OrdenDerivacion "1" -- "0..*" MuestraBiologica
+MuestraBiologica "0..*" -- "0..1" RemitoBiologico : se empaqueta en
+RemitoBiologico "0..*" -- "1" Contenedor
+RemitoBiologico "1" -- "1" PrecintoSanitario
+ClinicaVeterinaria "1" -- "0..*" RemitoBiologico : origen
+LaboratorioCentral "1" -- "0..*" RemitoBiologico : destino
+RemitoBiologico "1" -- "0..1" Envio
+RemitoBiologico "1" -- "0..1" RecepcionLaboratorio
+LaboratorioCentral "1" -- "0..*" RecepcionLaboratorio
+RemitoBiologico "1" -- "0..*" EventoRemito
+MuestraBiologica "1" -- "1" CadenaCustodia
+CadenaCustodia "1" -- "1..*" EventoCustodia
+MuestraBiologica "1" -- "1..*" EventoCustodia
+Envio "0..1" -- "0..*" EventoCustodia
+OrdenAnalisis "0..*" -- "0..1" MuestraBiologica : utiliza
+
+' Facturación
+Cliente "1" -- "0..*" Factura
+ClinicaVeterinaria "1" -- "0..*" Factura
+AtencionVeterinaria "0..1" -- "0..*" Factura
+OrdenDerivacion "0..1" -- "0..*" Factura
+Factura "1" -- "1..*" ComponenteAtencion
+AtencionVeterinaria "0..1" -- "0..*" ComponenteAtencion
+OrdenAnalisis "0..1" -- "0..*" ComponenteAtencion
+
+' Guías invisibles para mantener una lectura de arriba hacia abajo.
+PKG_CLINICO -[hidden]down-> PKG_VACUNACION
+PKG_VACUNACION -[hidden]right-> PKG_LABORATORIO
+PKG_LABORATORIO -[hidden]down-> PKG_TRANSPORTE
+PKG_TRANSPORTE -[hidden]down-> PKG_FACTURACION
+
+legend bottom left
+  |= Símbolo |= Significado |
+  | <<PK>> | Clave primaria |
+  | <<FK>> | Clave foránea |
+  | 0..1 | Relación opcional |
+  | 0..* | Cero o muchos registros |
+  | 1..* | Uno o muchos registros |
+endlegend
+
+@enduml

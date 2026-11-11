@@ -6,15 +6,18 @@ Create Date: 2026-10-13
 """
 
 from collections.abc import Sequence
+from pathlib import Path
 
-import backend.models  # noqa: F401
+from sqlalchemy import MetaData
+
 from alembic import op
-from backend.core.database import Base
 
 revision: str = "20261013_0001"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
+
+RUTA_ESQUEMA_INICIAL = Path(__file__).resolve().parents[1] / "schema_inicial.sql"
 
 
 TRIGGERS = (
@@ -48,9 +51,13 @@ def upgrade() -> None:
     if conexion.dialect.name != "sqlite":
         raise RuntimeError("Patitas usa exclusivamente SQLite")
 
-    # Esta revisión nació junto con los modelos. Las garantías que exceden los
-    # CHECK/FK declarativos se agregan debajo mediante SQL nativo de SQLite.
-    Base.metadata.create_all(bind=conexion, checkfirst=True)
+    # El esquema de esta revisión está congelado y no depende de los modelos
+    # actuales. Las revisiones posteriores pueden evolucionarlo de forma
+    # reproducible sin alterar el significado histórico de esta migración.
+    esquema = RUTA_ESQUEMA_INICIAL.read_text(encoding="utf-8")
+    for sentencia in esquema.split(";\n\n"):
+        if sentencia := sentencia.strip().rstrip(";"):
+            op.execute(sentencia)
 
     # Una conservadora no puede estar comprometida en dos remitos activos.
     op.execute(
@@ -514,4 +521,9 @@ def downgrade() -> None:
     for trigger in TRIGGERS:
         op.execute(f"DROP TRIGGER IF EXISTS {trigger}")
     op.execute("DROP INDEX IF EXISTS uq_remitos_contenedor_activo")
-    Base.metadata.drop_all(bind=conexion, checkfirst=True)
+    metadata = MetaData()
+    metadata.reflect(bind=conexion)
+    tabla_alembic = metadata.tables.get("alembic_version")
+    if tabla_alembic is not None:
+        metadata.remove(tabla_alembic)
+    metadata.drop_all(bind=conexion, checkfirst=True)

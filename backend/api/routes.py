@@ -22,6 +22,7 @@ from backend.models import (
     Contenedor,
     Envio,
     EventoCustodia,
+    EventoRemito,
     Factura,
     HistoriaClinica,
     LaboratorioCentral,
@@ -472,6 +473,21 @@ def listar_remitos(sesion: Session = Depends(obtener_sesion)):
     return serializar_lista(
         sesion.scalars(select(RemitoBiologico).order_by(RemitoBiologico.fecha_emision.desc())).all()
     )
+
+
+@router.get("/remitos/{remito_id}/trazabilidad", tags=["Custodia"])
+def trazabilidad_remito(
+    remito_id: UUID, sesion: Session = Depends(obtener_sesion)
+):
+    remito = sesion.get(RemitoBiologico, remito_id)
+    if remito is None:
+        raise RecursoNoEncontrado("remito", remito_id)
+    eventos = sesion.scalars(
+        select(EventoRemito)
+        .where(EventoRemito.remito_id == remito_id)
+        .order_by(EventoRemito.secuencia)
+    ).all()
+    return {"remito": serializar(remito), "eventos": serializar_lista(eventos)}
 
 
 @router.get("/envios", tags=["Custodia"])

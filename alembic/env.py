@@ -38,6 +38,18 @@ def ejecutar_migraciones_offline() -> None:
 
 
 def ejecutar_migraciones_online() -> None:
+    conexion_externa = config.attributes.get("connection")
+    if conexion_externa is not None:
+        context.configure(
+            connection=conexion_externa,
+            target_metadata=target_metadata,
+            compare_type=True,
+            render_as_batch=conexion_externa.dialect.name == "sqlite",
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     conectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
