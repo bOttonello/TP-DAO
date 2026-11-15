@@ -9,8 +9,11 @@ const state = {
   reportKey: "atenciones-derivaciones",
   reportData: null,
   reportFilters: {},
+  reportRequest: 0,
+  reportLoading: false,
   modal: null,
   submitting: false,
+  formRequest: 0,
 };
 
 const viewMeta = {
@@ -38,6 +41,7 @@ const {
   validarIntervaloTurno,
   validarNumeroEnRango,
 } = window.reglasFormulario;
+const { turnosDelDia, buscarConflictos, sugerirHorarios, modeloReporte, valoresDesdeFilas } = window.usabilidad;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -60,7 +64,7 @@ function shortId(value) {
 
 function formatDate(value, withTime = true) {
   if (!value) return "—";
-  const date = new Date(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? value + "T12:00" : value);
   if (Number.isNaN(date.getTime())) return escapeHtml(value);
   return new Intl.DateTimeFormat("es-AR", {
     day: "2-digit",
@@ -83,7 +87,7 @@ function displayValue(value) {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Sí" : "No";
   if (Array.isArray(value)) return value.length ? value.map(displayValue).join(", ") : "—";
-  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  if (typeof value === "object") return Object.entries(value).map(([key, item]) => `${titleCase(key)}: ${displayValue(item)}`).join(" · ");
   return String(value);
 }
 
@@ -117,7 +121,7 @@ async function api(path, options = {}) {
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {
     const validation = Array.isArray(payload?.detail)
-      ? payload.detail.map((item) => item.msg).join(". ")
+      ? payload.detail.map((item) => `${titleCase(item.loc?.slice(1).join(" · ") || "Datos")}: ${item.msg}`).join(". ")
       : null;
     throw new Error(payload?.detalle || validation || payload?.detail || `Error HTTP ${response.status}`);
   }
@@ -203,7 +207,7 @@ function choiceOptions(choices, selected = null) {
 function renderField(field, values) {
   const value = values[field.name] ?? field.value ?? "";
   const required = field.required ? "required" : "";
-  const full = field.full || field.type === "textarea" || field.type === "json" || field.type === "repeat" ? "field-full" : "";
+  const full = field.full || ["textarea", "values", "repeat"].includes(field.type) ? "field-full" : "";
   const help = field.help ? `<p class="field-help">${escapeHtml(field.help)}</p>` : "";
 
   if (field.type === "checkbox") {
@@ -213,6 +217,9 @@ function renderField(field, values) {
 
   if (field.type === "repeat") {
     return `<div class="field ${full}"><span>${escapeHtml(field.label)}</span><div class="repeat-list" id="component-list"></div><button type="button" class="button button-secondary button-small repeat-add" data-modal-action="add-component">+ Agregar componente</button>${help}</div>`;
+  }
+  if (field.type === "values") {
+    return `<div class="field field-full"><span>${escapeHtml(field.label)}</span><div id="result-values" class="repeat-list"></div><button type="button" class="button button-secondary button-small repeat-add" data-modal-action="add-value">+ Agregar parámetro</button>${help}</div>`;
   }
 
   if (field.type === "select" || field.type === "multiselect") {
@@ -232,19 +239,29 @@ function renderField(field, values) {
   return `<div class="field ${full}"><label for="field-${field.name}">${escapeHtml(field.label)}</label><input id="field-${field.name}" name="${field.name}" type="${escapeHtml(field.type || "text")}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.placeholder || "")}" ${field.step ? `step="${field.step}"` : ""} ${field.min !== undefined ? `min="${field.min}"` : ""} ${field.max !== undefined ? `max="${field.max}"` : ""} ${required}>${help}</div>`;
 }
 
+function addValueRow(values = {}) {
+  const row = document.createElement("div");
+  row.className = "value-item";
+  row.innerHTML = `<label>Parámetro<input name="result_name" value="${escapeHtml(values.nombre || "")}" placeholder="Ej.: hematocrito" required></label><label>Valor y unidad<input name="result_value" value="${escapeHtml(values.valor || "")}" placeholder="Ej.: 42 %" required></label><button type="button" class="icon-button" data-modal-action="remove-value" aria-label="Quitar parámetro">×</button>`;
+  $("#result-values").append(row);
+}
+
 function addComponentRow(values = {}) {
   const list = $("#component-list");
   if (!list) return;
   const row = document.createElement("div");
   row.className = "repeat-item";
   row.innerHTML = `
-    <input name="component_descripcion" placeholder="Descripción" value="${escapeHtml(values.descripcion || "")}" required>
-    <select name="component_tipo" required>${choiceOptions(["atencion", "laboratorio", "vacuna", "insumo", "otro"], values.tipo || "otro")}</select>
-    <input name="component_cantidad" type="number" step="0.01" min="0.01" value="${escapeHtml(values.cantidad || "1")}" required>
-    <input name="component_precio" type="number" step="0.01" min="0" placeholder="Precio" value="${escapeHtml(values.precio_unitario || "")}" required>
-    <input name="component_analisis" placeholder="ID análisis (opcional)" value="${escapeHtml(values.orden_analisis_id || "")}">
+    <label>Descripción<input name="component_descripcion" placeholder="Concepto facturado" value="${escapeHtml(values.descripcion || "")}" required></label>
+    <label>Tipo<select name="component_tipo" aria-label="Tipo de componente" required>${choiceOptions(["atencion", "laboratorio", "vacuna", "insumo", "otro"], values.tipo || "otro")}</select></label>
+    <label>Cantidad<input name="component_cantidad" type="number" step="0.01" min="0.01" value="${escapeHtml(values.cantidad || "1")}" required></label>
+    <label>Precio unitario<input name="component_precio" type="number" step="0.01" min="0" value="${escapeHtml(values.precio_unitario ?? "")}" required></label>
+    <label>Análisis asociado<select name="component_analisis" aria-label="Análisis asociado"><option value="">Sin vincular</option></select></label>
+    <output class="component-subtotal" aria-label="Subtotal del componente"></output>
     <button type="button" class="icon-button" data-modal-action="remove-component" aria-label="Quitar">×</button>`;
   list.append(row);
+  actualizarAnalisisFactura();
+  actualizarTotalFactura();
 }
 
 function formConfig(name, context = {}) {
@@ -416,9 +433,9 @@ function formConfig(name, context = {}) {
     },
     resultado: {
       title: "Registrar resultado", eyebrow: "Análisis de laboratorio", endpoint: "/resultados", method: "POST", fields: [
-        { name: "orden_analisis_id", label: "ID de análisis solicitado", required: true, value: context.solicitudId || "", help: "Puede copiarlo desde el detalle de una orden." },
+        { name: "orden_analisis_id", label: "Análisis listo para informar", type: "select", source: "solicitudesListas", required: true, value: context.solicitudId || "", help: "Solo se muestran análisis sin resultado de muestras recibidas y viables." },
         { name: "validado_por", label: "Validado por", required: true },
-        { name: "valores", label: "Valores del análisis (JSON)", type: "json", full: true, required: true, value: { valor: "" }, help: 'Ejemplo: {"hematocrito": 42, "unidad": "%"}' },
+        { name: "valores", label: "Parámetros del análisis", type: "values", full: true, required: true, help: "Ingresá un parámetro por fila con su valor y unidad. No necesitás escribir JSON." },
         { name: "conclusion", label: "Conclusión", type: "textarea", required: true }, { name: "observaciones", label: "Observaciones", type: "textarea" },
       ],
     },
@@ -426,7 +443,7 @@ function formConfig(name, context = {}) {
       title: "Emitir factura", eyebrow: "Facturación", endpoint: "/facturas", method: "POST", fields: [
         { name: "cliente_id", label: "Cliente", type: "select", source: "clientes", required: true }, { name: "clinica_id", label: "Clínica", type: "select", source: "clinicas", required: true },
         { name: "atencion_id", label: "Atención", type: "select", source: "atenciones" }, { name: "orden_derivacion_id", label: "Orden de derivación", type: "select", source: "ordenes" },
-        { name: "componentes", label: "Componentes", type: "repeat", full: true, help: "Los componentes de laboratorio pueden vincularse automáticamente cuando la orden contiene un único análisis." },
+        { name: "componentes", label: "Conceptos a facturar", type: "repeat", full: true, help: "El importe mostrado es una vista previa. El backend recalcula el total al emitir." },
       ],
     },
   };
@@ -440,25 +457,165 @@ function formConfig(name, context = {}) {
   };
 }
 
+function opcionesFiltradas(nombre, origen, items, vacio = "Seleccione…", autoseleccionar = true) {
+  const select = modalForm.elements[nombre];
+  if (!select) return;
+  const anterior = select.value;
+  select.innerHTML = `<option value="">${items.length ? vacio : "No hay opciones compatibles"}</option>`
+    + items.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(itemLabel(origen, item))}</option>`).join("");
+  select.value = items.some((item) => item.id === anterior) ? anterior : "";
+  if (autoseleccionar && !select.value && items.length === 1) select.value = items[0].id;
+}
+
+function sincronizarProfesionales() {
+  const clinica = modalForm.elements.clinica_id?.value;
+  opcionesFiltradas("profesional_id", "profesionales",
+    (state.cache.profesionales || []).filter((p) => p.activo && p.clinica_id === clinica),
+    "Seleccione profesional");
+}
+
+function sincronizarTurnoAtencion() {
+  if (state.modal?.key !== "atencion") return;
+  const campos = modalForm.elements;
+  opcionesFiltradas("turno_id", "turnos", (state.cache.turnos || []).filter((t) =>
+    ["programado", "confirmado"].includes(t.estado) && new Date(t.inicio) <= new Date()
+    && (!campos.mascota_id.value || t.mascota_id === campos.mascota_id.value)
+    && (!campos.clinica_id.value || t.clinica_id === campos.clinica_id.value)
+    && (!campos.profesional_id.value || t.profesional_id === campos.profesional_id.value)),
+  "Sin turno asociado", false);
+}
+
+function actualizarAgenda() {
+  const contenedor = $("#agenda-content");
+  if (!contenedor || state.modal?.key !== "turno") return;
+  const profesional = modalForm.elements.profesional_id.value;
+  const dia = $("#agenda-day").value;
+  const inicio = modalForm.elements.inicio;
+  const fin = modalForm.elements.fin;
+  inicio.setCustomValidity("");
+  if (!profesional) {
+    contenedor.innerHTML = '<p class="inline-note">Elegí una clínica y un profesional para consultar los horarios ocupados.</p>';
+    return;
+  }
+  const ocupados = turnosDelDia(state.cache.turnos || [], profesional, dia);
+  const conflictos = buscarConflictos(state.cache.turnos || [], profesional, inicio.value, fin.value);
+  if (conflictos.length) inicio.setCustomValidity("El horario se superpone con un turno del profesional.");
+  const duracion = (new Date(fin.value) - new Date(inicio.value)) / 60000;
+  const sugerencias = sugerirHorarios(state.cache.turnos || [], profesional, dia,
+    duracion > 0 ? duracion : 30);
+  contenedor.innerHTML = `
+    ${conflictos.length ? '<p class="inline-note is-danger" role="alert">El intervalo elegido se superpone con un turno. Elegí otro horario.</p>' : ""}
+    <h4>Horarios ocupados</h4>
+    ${ocupados.length ? table(ocupados, [
+      { label: "Inicio", value: (t) => formatDate(t.inicio) },
+      { label: "Fin", value: (t) => formatDate(t.fin) },
+      { label: "Paciente", value: (t) => relatedLabel("mascotas", t.mascota_id) },
+      { label: "Estado", html: true, value: (t) => badge(t.estado) },
+    ]) : '<p class="inline-note">No hay turnos ocupados registrados para este día.</p>'}
+    <h4>Horarios sin superposición · ${duracion > 0 ? duracion : 30} minutos</h4>
+    <p class="field-help">Sugerencias entre las 08:00 y las 20:00; no representan el horario laboral del profesional. También podés indicar otro intervalo manualmente. La disponibilidad se confirma al guardar.</p>
+    <div class="slot-list">${sugerencias.map((slot) => `<button type="button" class="button button-secondary button-small" data-modal-action="choose-slot" data-start="${fechaHoraLocal(slot.inicio)}" data-end="${fechaHoraLocal(slot.fin)}">${slot.inicio.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</button>`).join("") || '<p class="inline-note">No quedan sugerencias para este día y duración.</p>'}</div>`;
+}
+
+function actualizarAnalisisFactura() {
+  const ordenId = modalForm.elements.orden_derivacion_id?.value;
+  const detalle = (state.cache.detalleOrdenes || []).find((d) => d.orden.id === ordenId);
+  for (const row of $$(".repeat-item", modalFields)) {
+    const select = $('[name="component_analisis"]', row);
+    const anterior = select.value;
+    const laboratorio = $('[name="component_tipo"]', row).value === "laboratorio";
+    select.innerHTML = '<option value="">Sin vincular</option>' + (detalle?.analisis_solicitados || [])
+      .map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.analisis.nombre)}</option>`).join("");
+    select.value = laboratorio && [...select.options].some((o) => o.value === anterior) ? anterior : "";
+    select.disabled = !laboratorio || !detalle;
+  }
+}
+
+function actualizarTotalFactura() {
+  const resumen = $("#invoice-preview");
+  let total = 0;
+  for (const row of $$(".repeat-item", modalFields)) {
+    const cantidad = Number($('[name="component_cantidad"]', row).value);
+    const precio = Number($('[name="component_precio"]', row).value);
+    const subtotal = Number.isFinite(cantidad * precio) && cantidad > 0 && precio >= 0
+      ? Math.round((cantidad * precio + Number.EPSILON) * 100) / 100 : 0;
+    total += subtotal;
+    $(".component-subtotal", row).textContent = formatMoney(subtotal);
+  }
+  if (resumen) resumen.textContent = `Total estimado: ${formatMoney(total)}`;
+}
+
+function sincronizarFactura() {
+  const cliente = modalForm.elements.cliente_id.value;
+  const clinica = modalForm.elements.clinica_id.value;
+  const facturadas = new Set((state.cache.facturas || []).map((f) => f.atencion_id));
+  opcionesFiltradas("atencion_id", "atenciones", (state.cache.atenciones || []).filter((a) =>
+    !facturadas.has(a.id) && a.clinica_id === clinica
+    && findById("mascotas", a.mascota_id)?.cliente_id === cliente), "Sin atención asociada");
+  const atencion = modalForm.elements.atencion_id.value;
+  opcionesFiltradas("orden_derivacion_id", "ordenes", (state.cache.ordenes || []).filter((o) => {
+    const a = findById("atenciones", o.atencion_id);
+    return a?.clinica_id === clinica
+      && findById("mascotas", a.mascota_id)?.cliente_id === cliente
+      && (!atencion || o.atencion_id === atencion);
+  }), "Sin orden asociada");
+  actualizarAnalisisFactura();
+}
+
 async function openForm(name, context = {}) {
   if (controlEnvioModal.estaEnviando()) return;
+  const formRequest = ++state.formRequest;
+  closeDrawer();
   const config = formConfig(name, context);
   controlEnvioModal.restablecer(config.method);
   await loadCatalogs();
   if (name === "factura") {
     await fetchCached("atenciones", "/atenciones", true);
   }
+  if (name === "turno") await fetchCached("turnos", "/turnos", true);
+  if (["resultado", "factura"].includes(name)) {
+    state.cache.detalleOrdenes = await Promise.all((state.cache.ordenes || [])
+      .map((o) => api(`/ordenes-derivacion/${o.id}`)));
+    state.cache.solicitudesListas = state.cache.detalleOrdenes.flatMap((detalle) =>
+      detalle.analisis_solicitados.filter((s) => !s.resultado
+        && ["recibida", "analizada"].includes(findById("muestras", s.muestra_id)?.estado_actual))
+        .map((s) => ({ ...s, nombre: `${s.analisis.nombre} · ${detalle.orden.numero}` })));
+  }
+  if (formRequest !== state.formRequest) return;
   state.modal = config;
+  state.modalTrigger = document.activeElement;
   $("#modal-title").textContent = config.title;
   $("#modal-eyebrow").textContent = config.eyebrow;
   modalFields.innerHTML = `<div class="form-grid">${config.fields.map((field) => renderField(field, config.values || {})).join("")}</div>`;
   if (config.fields.some((field) => field.type === "repeat")) addComponentRow();
+  if (name === "resultado") addValueRow();
+  if (name === "resultado" && !state.cache.solicitudesListas.length)
+    modalFields.insertAdjacentHTML("afterbegin", '<p class="inline-note">No hay análisis listos para informar. Primero recibí una muestra viable desde Custodia y envíos.</p>');
+  if (name === "empaquetado") {
+    opcionesFiltradas("contenedor_id", "contenedores", (state.cache.contenedores || []).filter((c) => c.estado === "disponible"));
+    opcionesFiltradas("muestra_ids", "muestras", (state.cache.muestras || []).filter((m) => m.estado_actual === "extraida"));
+  }
+  if (["turno", "atencion"].includes(name)) sincronizarProfesionales();
+  if (name === "atencion") sincronizarTurnoAtencion();
+  if (name === "factura") {
+    modalFields.insertAdjacentHTML("beforeend", '<output id="invoice-preview" class="invoice-preview" aria-live="polite"></output>');
+    sincronizarFactura();
+    actualizarTotalFactura();
+  }
   if (name === "turno") {
     const inicio = $("#field-inicio", modalFields);
     const fin = $("#field-fin", modalFields);
-    const sincronizarFin = () => { fin.min = inicio.value || fechaHoraLocal(); };
-    inicio.addEventListener("input", sincronizarFin);
-    sincronizarFin();
+    modalFields.insertAdjacentHTML("beforeend", `<section class="agenda-preview" aria-labelledby="agenda-title"><div class="agenda-heading"><h3 id="agenda-title">Agenda del profesional</h3><label>Día a consultar<input type="date" id="agenda-day" value="${fechaHoraLocal().slice(0, 10)}" min="${fechaHoraLocal().slice(0, 10)}"></label><button type="button" class="button button-secondary button-small" data-modal-action="refresh-agenda">Actualizar agenda</button></div><div id="agenda-content" aria-live="polite"></div></section>`);
+    inicio.addEventListener("input", () => {
+      fin.min = inicio.value || fechaHoraLocal();
+      if (inicio.value) {
+        $("#agenda-day").value = inicio.value.slice(0, 10);
+        if (!fin.value || new Date(fin.value) <= new Date(inicio.value))
+          fin.value = fechaHoraLocal(new Date(new Date(inicio.value).getTime() + 30 * 60000));
+      }
+      actualizarAgenda();
+    });
+    actualizarAgenda();
   }
   modalBackdrop.hidden = false;
   document.body.style.overflow = "hidden";
@@ -467,6 +624,7 @@ async function openForm(name, context = {}) {
 
 function closeModal() {
   if (controlEnvioModal.estaEnviando()) return false;
+  ++state.formRequest;
   const method = state.modal?.method || "POST";
   modalBackdrop.hidden = true;
   document.body.style.overflow = "";
@@ -474,13 +632,14 @@ function closeModal() {
   modalForm.removeAttribute("aria-busy");
   controlEnvioModal.restablecer(method);
   state.modal = null;
+  state.modalTrigger?.focus();
   return true;
 }
 
 function serializeForm(config) {
   const data = {};
   for (const field of config.fields) {
-    if (field.type === "repeat") continue;
+    if (["repeat", "values"].includes(field.type)) continue;
     const element = modalForm.elements[field.name];
     if (!element) continue;
     let value;
@@ -501,7 +660,11 @@ function serializeForm(config) {
 
   if (config.key === "turno") {
     validarIntervaloTurno(data.inicio, data.fin);
+    if (buscarConflictos(state.cache.turnos || [], data.profesional_id, data.inicio, data.fin).length)
+      throw new Error("El profesional ya tiene un turno en ese intervalo. Elegí otro horario.");
   }
+  if (config.key === "resultado") data.valores = valoresDesdeFilas($$(".value-item", modalFields)
+    .map((row) => ({ nombre: $('[name="result_name"]', row).value, valor: $('[name="result_value"]', row).value })));
 
   if (config.key === "factura") {
     const rows = $$(".repeat-item", modalFields);
@@ -525,6 +688,7 @@ async function submitModal(event) {
   event.preventDefault();
   const config = state.modal;
   if (!config) return;
+  if (!modalForm.reportValidity()) return;
   let body;
   try {
     body = serializeForm(config);
@@ -552,6 +716,7 @@ async function submitModal(event) {
 }
 
 function openDrawer(title, data, eyebrow = "Detalle") {
+  drawer.inert = false;
   $("#drawer-title").textContent = title;
   $("#drawer-eyebrow").textContent = eyebrow;
   $("#drawer-content").innerHTML = renderDetail(data);
@@ -560,6 +725,7 @@ function openDrawer(title, data, eyebrow = "Detalle") {
 }
 
 function closeDrawer() {
+  drawer.inert = true;
   drawer.classList.remove("is-open");
   drawer.setAttribute("aria-hidden", "true");
 }
@@ -568,12 +734,46 @@ function renderDetail(data) {
   if (data === null || data === undefined) return `<div class="empty-state"><span class="empty-mark">i</span><strong>Sin información</strong></div>`;
   if (Array.isArray(data)) return data.map((item, index) => `<h3>Registro ${index + 1}</h3>${renderDetail(item)}`).join("");
   if (typeof data !== "object") return `<p>${escapeHtml(displayValue(data))}</p>`;
-  return `<dl class="detail-list">${Object.entries(data).map(([key, value]) => {
-    const rendered = typeof value === "object" && value !== null
-      ? `<pre class="mono">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`
-      : escapeHtml(displayValue(value));
-    return `<div class="detail-row"><dt>${escapeHtml(titleCase(key))}</dt><dd>${rendered}</dd></div>`;
-  }).join("")}</dl>`;
+  const relaciones = { cliente_id: "clientes", mascota_id: "mascotas", clinica_id: "clinicas",
+    clinica_origen_id: "clinicas", laboratorio_id: "laboratorio", laboratorio_destino_id: "laboratorio",
+    profesional_id: "profesionales", profesional_solicitante_id: "profesionales", atencion_id: "atenciones",
+    orden_id: "ordenes", orden_derivacion_id: "ordenes", muestra_id: "muestras", contenedor_id: "contenedores",
+    remito_id: "remitos", envio_id: "envios", vacuna_id: "vacunas", analisis_id: "analisis" };
+  return `<dl class="detail-list">${Object.entries(data).filter(([key]) =>
+    !["id", "creado_en", "actualizado_en", "clave_singleton", "historia_clinica_id", "cadena_custodia_id"].includes(key))
+    .map(([key, value]) => {
+      let rendered;
+      if (typeof value === "object" && value !== null) rendered = `<div class="nested-detail">${value instanceof Array && !value.length ? "Sin registros" : renderDetail(value)}</div>`;
+      else if (relaciones[key] && value) rendered = escapeHtml(relatedLabel(relaciones[key], value));
+      else if (value && /^\d{4}-\d{2}-\d{2}/.test(String(value))) rendered = escapeHtml(formatDate(value, String(value).length > 10));
+      else if (["subtotal", "total", "precio", "precio_unitario", "descuento", "importe_neto", "importe_bruto"].includes(key)) rendered = escapeHtml(formatMoney(value));
+      else rendered = escapeHtml(displayValue(value));
+      return `<div class="detail-row"><dt>${escapeHtml(titleCase(key.replace(/_id$/, "")))}</dt><dd>${rendered}</dd></div>`;
+    }).join("")}</dl>`;
+}
+
+function renderFacturaDetalle(detail) {
+  const factura = detail.factura;
+  const cliente = findById("clientes", factura.cliente_id);
+  return `<article class="invoice-document">
+    <div class="invoice-heading"><span class="eyebrow">Comprobante de atención</span><h3>${escapeHtml(factura.numero)}</h3>${badge(factura.estado)}</div>
+    <dl class="history-grid"><div><dt>Responsable</dt><dd>${escapeHtml(relatedLabel("clientes", factura.cliente_id))}</dd></div>
+    <div><dt>Clínica</dt><dd>${escapeHtml(relatedLabel("clinicas", factura.clinica_id))}</dd></div>
+    <div><dt>Emisión</dt><dd>${formatDate(factura.fecha_emision, false)}</dd></div>
+    <div><dt>Vencimiento</dt><dd>${formatDate(factura.fecha_vencimiento, false)}</dd></div></dl>
+    ${cliente?.direccion ? `<p class="inline-note">${escapeHtml(cliente.direccion)}</p>` : ""}
+    ${table(detail.componentes || [], [
+      { label: "Concepto", value: "descripcion" },
+      { label: "Tipo", value: (i) => titleCase(i.tipo) },
+      { label: "Cantidad", value: "cantidad" },
+      { label: "Precio unitario", value: (i) => formatMoney(i.precio_unitario) },
+      { label: "Subtotal", value: (i) => formatMoney(i.subtotal) },
+    ])}
+    <dl class="invoice-totals"><div><dt>Subtotal</dt><dd>${formatMoney(factura.subtotal)}</dd></div>
+    <div><dt>Descuento</dt><dd>${formatMoney(factura.descuento)}</dd></div>
+    <div class="invoice-total"><dt>Total</dt><dd>${formatMoney(factura.total)}</dd></div></dl>
+    ${factura.observaciones ? `<p>${escapeHtml(factura.observaciones)}</p>` : ""}
+    </article>`;
 }
 
 function renderHistoriaClinica(detail) {
@@ -624,7 +824,10 @@ function emptyState(title, copy = "Cree el primer registro para comenzar.") {
 function table(records, columns, emptyTitle = "Todavía no hay registros") {
   if (!records?.length) return emptyState(emptyTitle);
   return `<div class="table-wrap"><table><thead><tr>${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}</tr></thead><tbody>${records.map((record, index) => {
-    const searchText = Object.values(record).map(displayValue).join(" ").toLowerCase();
+    const searchText = columns.map((column) => typeof column.value === "function"
+      ? column.value(record, index) : record[column.value])
+      .map((value) => displayValue(value).replace(/<[^>]*>/g, " ")).join(" ")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     return `<tr data-search-row data-search-text="${escapeHtml(searchText)}">${columns.map((column) => {
       const value = typeof column.value === "function" ? column.value(record, index) : record[column.value];
       return `<td>${column.html ? value : escapeHtml(displayValue(value))}</td>`;
@@ -748,7 +951,7 @@ function renderPacientes() {
 }
 
 function renderAtencion() {
-  const appointments = state.cache.turnos || [];
+  const appointments = [...(state.cache.turnos || [])].sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
   const attentions = state.cache.atenciones || [];
   const applications = state.cache.aplicaciones || [];
   const appointmentTable = table(appointments, [
@@ -758,8 +961,9 @@ function renderAtencion() {
     { label: "Tipo", html: true, value: (item) => badge(item.tipo || "consulta") },
     { label: "Motivo", value: "motivo" },
     { label: "Estado", html: true, value: (item) => badge(item.estado) },
-    { label: "Acción", html: true, value: (item) => item.estado === "atendido"
-      ? "Registrada"
+    { label: "Acción", html: true, value: (item) => item.estado === "atendido" ? "Registrada"
+      : ["cancelado", "ausente"].includes(item.estado) ? "No disponible"
+      : new Date(item.inicio) > new Date() ? "Pendiente de inicio"
       : smallAction("appointment-attend", "Registrar", `data-id="${item.id}"`) },
   ], "No hay turnos programados");
   const attentionTable = table(attentions, [
@@ -792,12 +996,13 @@ function renderLaboratorio() {
   const results = state.cache.resultados || [];
   const orderTable = table(orders, [
     { label: "Orden", html: true, value: (item) => `<div class="primary-cell"><strong>${escapeHtml(item.numero)}</strong><span>${escapeHtml(formatDate(item.fecha_emision))}</span></div>` },
-    { label: "Atención", value: (item) => shortId(item.atencion_id) },
+    { label: "Atención", value: (item) => relatedLabel("atenciones", item.atencion_id) },
     { label: "Prioridad", html: true, value: (item) => badge(item.prioridad) },
     { label: "Estado", html: true, value: (item) => badge(item.estado) },
     { label: "Acciones", html: true, value: (item) => rowActions([
       smallAction("order-detail", "Detalle", `data-id="${item.id}"`),
-      smallAction("open-form", "Extraer", `data-form="muestra" data-order-id="${item.id}"`),
+      ...(["emitida", "muestra_extraida", "requiere_nueva_muestra"].includes(item.estado)
+        ? [smallAction("open-form", "Extraer", `data-form="muestra" data-order-id="${item.id}"`)] : []),
     ]) },
   ], "No hay órdenes de derivación");
   const sampleTable = table(samples, [
@@ -840,7 +1045,7 @@ function renderCustodia() {
     { label: "Origen", value: (item) => relatedLabel("clinicas", item.clinica_origen_id) },
     { label: "Estado", html: true, value: (item) => badge(item.estado) },
     { label: "Acciones", html: true, value: (item) => {
-      const actions = [smallAction("generic-detail", "Detalle", `data-source="remitos" data-id="${item.id}"`)];
+      const actions = [smallAction("remittance-trace", "Trazabilidad", `data-id="${item.id}"`)];
       if (item.estado === "emitido") actions.push(smallAction("dispatch", "Despachar", `data-id="${item.id}" data-number="${escapeHtml(item.numero)}"`));
       if (item.estado === "en_transito") actions.push(smallAction("receive", "Recibir", `data-id="${item.id}" data-number="${escapeHtml(item.numero)}"`));
       return rowActions(actions);
@@ -984,7 +1189,26 @@ function renderReportResult() {
       { label: "", html: true, value: (_item, index) => smallAction("report-detail", "Detalle", `data-index="${index}"`) },
     ];
   }
-  return table(data, columns);
+  return renderGraficoReporte(state.reportKey, data) + table(data, columns);
+}
+
+function renderGraficoReporte(key, data) {
+  const modelo = modeloReporte(key, data);
+  const formato = (valor) => valor === null ? "Sin datos"
+    : modelo.unidad === "ARS" ? formatMoney(valor)
+    : new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(valor)
+      + (modelo.unidad === "horas" ? " h" : "");
+  const maximo = Math.max(1, ...modelo.barras.flatMap((b) => b.valores)
+    .filter((v) => v !== null && Number.isFinite(Number(v))).map(Number));
+  const formatoMetrica = (valor) => modelo.unidad === "ARS" ? formatMoney(valor)
+    : new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(valor);
+  return `<section class="report-summary" aria-label="Indicadores del reporte">${modelo.metricas.map(([nombre, valor]) =>
+    `<article class="metric-mini"><span>${escapeHtml(nombre)}</span><strong>${escapeHtml(formatoMetrica(valor))}</strong></article>`).join("")}</section>
+    <figure class="report-chart"><figcaption>${escapeHtml(modelo.titulo)}</figcaption>
+    <div class="chart-legend">${modelo.series.map((s, i) => `<span><i class="chart-color series-${i}" aria-hidden="true"></i>${escapeHtml(s)}</span>`).join("")}</div>
+    <div class="chart-rows">${modelo.barras.map((b) => `<div class="chart-row"><strong>${escapeHtml(titleCase(b.etiqueta))}</strong><div>${b.valores.map((v, i) =>
+      `<div class="chart-value"><span class="chart-track" aria-hidden="true"><span class="chart-bar series-${i}" style="width:${v === null ? 0 : Math.max(0, Math.min(100, Number(v) / maximo * 100))}%"></span></span><span>${escapeHtml(modelo.series[i])}: ${escapeHtml(formato(v))}</span></div>`).join("")}</div></div>`).join("")}</div>
+    <p class="field-help">Las barras usan una escala común. Los valores exactos y el desglose completo están en la tabla.</p></figure>`;
 }
 
 function renderReportes() {
@@ -997,19 +1221,20 @@ function renderReportes() {
     <section class="panel">
       <header class="panel-header"><div><h2>${escapeHtml(current.title)}</h2><p>${escapeHtml(current.copy)}</p></div></header>
       <div class="filter-row">
-        <input class="compact-field" id="report-from" type="date" value="${escapeHtml(filters.desde || "")}" aria-label="Fecha desde">
-        <input class="compact-field" id="report-to" type="date" value="${escapeHtml(filters.hasta || "")}" aria-label="Fecha hasta">
-        <select class="compact-field" id="report-clinic" aria-label="Clínica"><option value="">Todas las clínicas</option>${optionsFor("clinicas", filters.clinica_id || null)}</select>
-        ${state.reportKey === "tratamientos-vacunas" ? `<input class="compact-field" id="report-reference" type="date" value="${escapeHtml(filters.fecha_referencia || "")}" aria-label="Fecha de referencia">` : ""}
-        ${state.reportKey === "tiempos-muestras" ? `<input class="compact-field" id="report-threshold" type="number" min="0.1" step="0.1" value="${escapeHtml(filters.umbral_transito_horas || "24")}" aria-label="Umbral de tránsito">` : ""}
-        <button class="button button-primary" data-action="run-report">Generar reporte</button>
+        <label>Desde<input class="compact-field" id="report-from" type="date" value="${escapeHtml(filters.desde || "")}" aria-label="Fecha desde"></label>
+        <label>Hasta<input class="compact-field" id="report-to" type="date" value="${escapeHtml(filters.hasta || "")}" aria-label="Fecha hasta"></label>
+        <label>Clínica<select class="compact-field" id="report-clinic" aria-label="Clínica"><option value="">Todas las clínicas</option>${optionsFor("clinicas", filters.clinica_id || null)}</select></label>
+        ${state.reportKey === "tratamientos-vacunas" ? `<label>Fecha de referencia<input class="compact-field" id="report-reference" type="date" value="${escapeHtml(filters.fecha_referencia || "")}" aria-label="Fecha de referencia"></label>` : ""}
+        ${state.reportKey === "tiempos-muestras" ? `<label>Demora de tránsito (horas)<input class="compact-field" id="report-threshold" type="number" min="0.1" step="0.1" value="${escapeHtml(filters.umbral_transito_horas || "24")}" aria-label="Umbral de tránsito"></label>` : ""}
+        <button class="button button-primary" data-action="run-report" ${state.reportLoading ? "disabled" : ""}>${state.reportLoading ? "Generando…" : "Generar reporte"}</button>
       </div>
-      <div class="panel-body">${renderReportResult()}</div>
+      <div class="panel-body">${state.reportError ? `<p class="inline-note is-danger" role="alert">${escapeHtml(state.reportError)}</p>` : state.reportLoading ? '<p class="inline-note" role="status">Consultando indicadores…</p>' : renderReportResult()}</div>
     </section>
   </div>`;
 }
 
 async function runReport() {
+  if (state.reportLoading) return;
   const filters = {
     desde: $("#report-from")?.value || "",
     hasta: $("#report-to")?.value || "",
@@ -1017,17 +1242,33 @@ async function runReport() {
     fecha_referencia: $("#report-reference")?.value || "",
     umbral_transito_horas: $("#report-threshold")?.value || "",
   };
+  if (filters.desde && filters.hasta && filters.desde > filters.hasta) {
+    toast("La fecha desde no puede ser posterior a la fecha hasta.", "error");
+    return;
+  }
+  if (filters.umbral_transito_horas && !(Number(filters.umbral_transito_horas) > 0)) {
+    toast("El umbral de tránsito debe ser mayor a cero.", "error");
+    return;
+  }
   state.reportFilters = filters;
+  const requestId = ++state.reportRequest;
+  const reportKey = state.reportKey;
+  state.reportLoading = true;
+  state.reportError = "";
+  state.reportData = null;
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value); });
-  root.classList.add("is-loading");
+  renderReportes();
   try {
-    state.reportData = await api(`/reportes/${state.reportKey}${params.size ? `?${params}` : ""}`);
-    renderReportes();
+    const result = await api(`/reportes/${reportKey}${params.size ? `?${params}` : ""}`);
+    if (state.reportRequest === requestId) state.reportData = result;
   } catch (error) {
-    toast(error.message, "error");
+    if (state.reportRequest === requestId) state.reportError = error.message;
   } finally {
-    root.classList.remove("is-loading");
+    if (state.reportRequest === requestId) {
+      state.reportLoading = false;
+      if (state.view === "reportes" && state.reportKey === reportKey) renderReportes();
+    }
   }
 }
 
@@ -1057,6 +1298,7 @@ async function renderCurrentView(force = false) {
 
 async function changeView(view) {
   if (!viewMeta[view]) return;
+  closeDrawer();
   state.view = view;
   const [title, eyebrow] = viewMeta[view];
   $("#page-title").textContent = title;
@@ -1129,7 +1371,8 @@ async function handleAction(button) {
     try {
       const detail = await api(`/ordenes-derivacion/${id}`);
       openDrawer(detail.orden.numero, detail, "Orden de derivación");
-      const pending = detail.analisis_solicitados.filter((item) => !item.resultado);
+      const pending = detail.analisis_solicitados.filter((item) => !item.resultado
+        && ["recibida", "analizada"].includes(findById("muestras", item.muestra_id)?.estado_actual));
       if (pending.length) {
         $("#drawer-content").insertAdjacentHTML("afterbegin", `<div class="button-row" style="margin-bottom:16px">${pending.map((item) => `<button class="button button-primary button-small" data-action="result-for" data-request-id="${item.id}">Resultado · ${escapeHtml(item.analisis.nombre)}</button>`).join("")}</div>`);
       }
@@ -1147,6 +1390,7 @@ async function handleAction(button) {
       $("#drawer-eyebrow").textContent = "Trazabilidad inmutable";
       $("#drawer-content").innerHTML = `${renderDetail(detail.muestra)}<div class="timeline">${detail.eventos.map((event) => `<article class="timeline-item"><strong>${escapeHtml(titleCase(event.tipo_evento))} · ${escapeHtml(titleCase(event.estado_nuevo))}</strong><span>${escapeHtml(event.ubicacion)} · ${escapeHtml(event.actor)}</span><small>${escapeHtml(formatDate(event.ocurrido_en))}${event.temperatura_c !== null ? ` · ${escapeHtml(event.temperatura_c)} °C` : ""}</small></article>`).join("")}</div>`;
       drawer.classList.add("is-open");
+      drawer.inert = false;
       drawer.setAttribute("aria-hidden", "false");
     } catch (error) { toast(error.message, "error"); }
     return;
@@ -1155,8 +1399,17 @@ async function handleAction(button) {
   if (action === "receive") return openForm("recepcion", { id, number: button.dataset.number });
   if (action === "transfer") return openForm("transferencia", { id });
   if (action === "invoice-detail") {
-    try { const detail = await api(`/facturas/${id}`); openDrawer(detail.factura.numero, detail, "Comprobante de atención"); }
+    try {
+      const detail = await api(`/facturas/${id}`);
+      openDrawer(detail.factura.numero, null, "Comprobante de atención");
+      $("#drawer-content").innerHTML = renderFacturaDetalle(detail);
+    }
     catch (error) { toast(error.message, "error"); }
+    return;
+  }
+  if (action === "remittance-trace") {
+    const detail = await api(`/remitos/${id}/trazabilidad`);
+    openDrawer(detail.remito.numero, detail, "Trazabilidad del remito");
     return;
   }
   if (action === "generic-detail") {
@@ -1165,8 +1418,11 @@ async function handleAction(button) {
     return openDrawer(itemLabel(source, item), item, titleCase(source));
   }
   if (action === "select-report") {
+    ++state.reportRequest;
     state.reportKey = button.dataset.key;
     state.reportData = null;
+    state.reportLoading = false;
+    state.reportError = "";
     return renderReportes();
   }
   if (action === "run-report") return runReport();
@@ -1202,20 +1458,73 @@ function init() {
     const button = event.target.closest("[data-modal-action]");
     if (!button) return;
     if (button.dataset.modalAction === "add-component") addComponentRow();
-    if (button.dataset.modalAction === "remove-component") button.closest(".repeat-item")?.remove();
+    if (button.dataset.modalAction === "remove-component") { button.closest(".repeat-item")?.remove(); actualizarTotalFactura(); }
+    if (button.dataset.modalAction === "add-value") addValueRow();
+    if (button.dataset.modalAction === "remove-value") button.closest(".value-item")?.remove();
+    if (button.dataset.modalAction === "choose-slot") {
+      modalForm.elements.inicio.value = button.dataset.start;
+      modalForm.elements.fin.value = button.dataset.end;
+      actualizarAgenda();
+    }
+    if (button.dataset.modalAction === "refresh-agenda") {
+      button.disabled = true;
+      fetchCached("turnos", "/turnos", true).then(actualizarAgenda)
+        .catch((error) => toast("No se pudo actualizar la agenda: " + error.message, "error"))
+        .finally(() => { button.disabled = false; });
+    }
+  });
+  modalFields.addEventListener("change", (event) => {
+    const nombre = event.target.name;
+    if (["turno", "atencion"].includes(state.modal?.key) && nombre === "clinica_id") sincronizarProfesionales();
+    if (state.modal?.key === "atencion") {
+      if (nombre === "turno_id" && event.target.value) {
+        const turno = findById("turnos", event.target.value);
+        for (const campo of ["mascota_id", "clinica_id", "tipo", "motivo"])
+          modalForm.elements[campo].value = turno[campo] || "";
+        sincronizarProfesionales();
+        modalForm.elements.profesional_id.value = turno.profesional_id;
+      }
+      if (["mascota_id", "clinica_id", "profesional_id", "turno_id"].includes(nombre)) sincronizarTurnoAtencion();
+    }
+    if (state.modal?.key === "turno") actualizarAgenda();
+    if (state.modal?.key === "factura") {
+      if (["cliente_id", "clinica_id", "atencion_id"].includes(nombre)) sincronizarFactura();
+      if (["orden_derivacion_id", "component_tipo"].includes(nombre)) actualizarAnalisisFactura();
+      if (nombre === "component_analisis" && event.target.value) {
+        const row = event.target.closest(".repeat-item");
+        const solicitud = (state.cache.detalleOrdenes || []).flatMap((d) => d.analisis_solicitados)
+          .find((s) => s.id === event.target.value);
+        if (solicitud) {
+          $('[name="component_descripcion"]', row).value = solicitud.analisis.nombre;
+          $('[name="component_precio"]', row).value = solicitud.analisis.precio;
+        }
+      }
+      actualizarTotalFactura();
+    }
+  });
+  modalFields.addEventListener("input", (event) => {
+    if (state.modal?.key === "turno" && event.target.name === "fin") actualizarAgenda();
+    if (state.modal?.key === "factura") actualizarTotalFactura();
   });
   $("#drawer-close").addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Tab" && !modalBackdrop.hidden) {
+      const controles = $$('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)', modalBackdrop);
+      const primero = controles[0];
+      const ultimo = controles.at(-1);
+      if (event.shiftKey && document.activeElement === primero) { event.preventDefault(); ultimo?.focus(); }
+      else if (!event.shiftKey && document.activeElement === ultimo) { event.preventDefault(); primero?.focus(); }
+    }
     if (event.key === "Escape") { if (!modalBackdrop.hidden) closeModal(); else closeDrawer(); }
   });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
-    if (button) handleAction(button);
+    if (button) handleAction(button).catch((error) => toast(error.message, "error"));
   });
   document.addEventListener("input", (event) => {
     if (!event.target.matches("[data-table-search]")) return;
     const panelNode = event.target.closest(".panel");
-    const query = event.target.value.trim().toLowerCase();
+    const query = event.target.value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     $$("[data-search-row]", panelNode).forEach((row) => { row.hidden = !row.dataset.searchText.includes(query); });
   });
   checkHealth();

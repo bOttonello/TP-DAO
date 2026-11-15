@@ -19,6 +19,7 @@ def test_frontend_y_recursos_estaticos() -> None:
         javascript = cliente.get("/static/app.js")
         estado_modal = cliente.get("/static/modal-state.js")
         reglas_formulario = cliente.get("/static/form-rules.js")
+        usabilidad = cliente.get("/static/usability.js?v=20261115.1")
 
     assert pagina.status_code == 200
     assert "Patitas" in pagina.text
@@ -29,10 +30,13 @@ def test_frontend_y_recursos_estaticos() -> None:
     assert "renderDashboard" in javascript.text
     assert estado_modal.status_code == 200
     assert reglas_formulario.status_code == 200
-    assert pagina.text.index("modal-state.js?v=20261020.4") < pagina.text.index(
-        "form-rules.js?v=20261020.4"
+    assert usabilidad.status_code == 200
+    assert pagina.text.index("modal-state.js?v=20261115.1") < pagina.text.index(
+        "form-rules.js?v=20261115.1"
     ) < pagina.text.index(
-        "app.js?v=20261020.4"
+        "usability.js?v=20261115.1"
+    ) < pagina.text.index(
+        "app.js?v=20261115.1"
     )
     assert "renderHistoriaClinica" in javascript.text
     assert 'min: "24", max: "45"' in javascript.text
@@ -52,6 +56,20 @@ def test_ciclo_de_estado_del_modal_en_javascript() -> None:
         check=False,
     )
 
+    assert resultado.returncode == 0, resultado.stdout + resultado.stderr
+
+
+def test_usabilidad_en_javascript() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js no está disponible para la prueba del frontend")
+    resultado = subprocess.run(
+        [node, "--test", "tests/frontend_usability.test.cjs"],
+        cwd=RAIZ_PROYECTO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
 
 

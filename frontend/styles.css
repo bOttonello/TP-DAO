@@ -1379,3 +1379,67 @@ tbody tr:last-child td {
     transition-duration: 1ms !important;
   }
 }
+
+/* Agenda, comprobantes y reportes: información legible sin formatos técnicos. */
+.modal { width: min(940px, 100%); }
+.detail-drawer { width: min(850px, 100%); }
+.field label, .field > span, .filter-row > label { font-size: 12px; }
+.field-help { font-size: 12px; }
+table { font-size: 12px; }
+.detail-row dt { font-size: 12px; }
+.detail-row dd { font-size: 13px; }
+.nested-detail { padding: 0 12px; border-left: 2px solid var(--sage-200); }
+.nested-detail .detail-row { grid-template-columns: minmax(90px, .6fr) minmax(0, 1fr); }
+.nested-detail h3 { margin-top: 16px; }
+.inline-note { margin: 12px 0; padding: 12px 14px; border-radius: 9px; background: var(--sage-50); color: var(--ink-700); font-size: 13px; line-height: 1.6; }
+.inline-note.is-danger { color: var(--rose-600); background: var(--rose-100); border: 1px solid currentColor; }
+.agenda-preview { margin-top: 24px; padding: 18px; border: 1px solid var(--sage-200); border-radius: 12px; background: var(--white); }
+.agenda-heading { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.agenda-heading h3 { margin-right: auto; }
+.agenda-heading label { font-size: 12px; }
+.agenda-heading input { display: block; padding: 8px; margin-top: 6px; border: 1px solid var(--ink-200); border-radius: 7px; }
+.agenda-preview h4 { margin: 18px 0 10px; font-size: 13px; }
+.slot-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.slot-list .button { min-height: 36px; }
+.repeat-item { grid-template-columns: 2fr 1fr 1fr; align-items: end; border-color: var(--ink-200); }
+.repeat-item label, .value-item label { display: grid; gap: 6px; font-size: 12px; margin: 0; }
+.repeat-item input, .repeat-item select { font-size: 13px; }
+.component-subtotal { padding: 10px 0; font-weight: 700; color: var(--sage-700); }
+.value-item { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+.invoice-preview { display: block; margin-top: 18px; padding: 14px; text-align: right; background: var(--sage-100); border-radius: 9px; color: var(--sage-700); font-size: 18px; font-weight: 700; }
+.invoice-document { padding: 18px; background: var(--white); border: 1px solid var(--ink-200); border-radius: 12px; }
+.invoice-heading { padding-bottom: 18px; border-bottom: 1px solid var(--ink-100); }
+.invoice-heading h3 { font-size: 22px; margin: 8px 0; overflow-wrap: anywhere; }
+.invoice-document .history-grid { margin: 18px 0; }
+.invoice-document .history-grid dd { font-size: 13px; }
+.invoice-document table { margin-top: 18px; }
+.invoice-totals { max-width: 340px; margin: 24px 0 0 auto; }
+.invoice-totals > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.invoice-totals dd { margin: 0; font-weight: 700; }
+.invoice-total { border-top: 2px solid var(--sage-200); color: var(--sage-700); font-size: 21px; }
+.report-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.report-summary .metric-mini span { font-size: 12px; }
+.report-summary .metric-mini strong { font-size: clamp(21px, 3vw, 28px); overflow-wrap: anywhere; }
+.report-chart { margin: 0 0 24px; padding: 20px; border: 1px solid var(--ink-100); border-radius: 12px; background: var(--paper); }
+.report-chart figcaption { font-weight: 700; font-size: 15px; }
+.chart-legend, .chart-legend > span { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.chart-legend { gap: 18px; margin: 14px 0 20px; }
+.chart-color { width: 12px; height: 12px; display: inline-block; border-radius: 3px; }
+.series-0 { background: var(--sage-700); }
+.series-1 { background: #537a9a; }
+.chart-rows { display: grid; gap: 18px; max-height: 460px; overflow-y: auto; padding-right: 8px; }
+.chart-row { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 2fr); gap: 16px; align-items: center; }
+.chart-row > strong { font-size: 12px; overflow-wrap: anywhere; }
+.chart-value { display: grid; grid-template-columns: minmax(60px, 1fr) minmax(130px, auto); gap: 12px; align-items: center; margin: 6px 0; font-size: 12px; }
+.chart-track { display: block; height: 12px; background: var(--ink-100); border-radius: 4px; overflow: hidden; }
+.chart-bar { display: block; height: 100%; border-radius: 4px; }
+.filter-row { align-items: end; }
+.filter-row > label { display: grid; gap: 6px; color: var(--ink-700); }
+:focus-visible { outline: 2px solid var(--sage-700); outline-offset: 3px; }
+@media (max-width: 620px) {
+  .repeat-item, .value-item { grid-template-columns: 1fr; }
+  .chart-row { grid-template-columns: 1fr; gap: 4px; }
+  .chart-value { grid-template-columns: minmax(40px, 1fr) minmax(120px, auto); }
+  .nested-detail .detail-row { grid-template-columns: 1fr; }
+  .agenda-preview, .report-chart, .invoice-document { padding: 12px; }
+}
